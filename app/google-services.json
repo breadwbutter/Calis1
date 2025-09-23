@@ -12,7 +12,20 @@
           "package_name": "com.example.calis1"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "232333095169-b3i4c1bdeqepvlnau0epnn6b97m4cgoh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.calis1",
+            "certificate_hash": "5c80acb9ebd75a0901006bf0ca4678809178ec1c"
+          }
+        },
+        {
+          "client_id": "232333095169-1mde1p99go5n2rgqsacntsq2n3tfeafn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyB3x5K9VCoFVXPHGuKYNfbAjI42oSQghGY"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "232333095169-1mde1p99go5n2rgqsacntsq2n3tfeafn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
