@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "232333095169",
+    "project_id": "calis1-5faee",
+    "storage_bucket": "calis1-5faee.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:232333095169:android:52d2628f7704a2f304ab00",
+        "android_client_info": {
+          "package_name": "com.example.calis1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3x5K9VCoFVXPHGuKYNfbAjI42oSQghGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
