@@ -1,4 +1,4 @@
-package com.example.calis1.data.data.dao
+package com.example.calis1.data.dao
 
 import androidx.lifecycle.LiveData
 import androidx.room.*

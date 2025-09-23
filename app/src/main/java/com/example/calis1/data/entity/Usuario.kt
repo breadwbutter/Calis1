@@ -1,12 +1,13 @@
-package com.example.calis1.data.data.entity
+package com.example.calis1.data.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(tableName = "usuarios")
 data class Usuario(
     @PrimaryKey
-    val id: String = java.util.UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val nombre: String = "",
     val edad: Int = 0,
     val timestamp: Long = System.currentTimeMillis()

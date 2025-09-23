@@ -1,4 +1,4 @@
-package com.example.calis1.data.data.database
+package com.example.calis1.data.database
 
 import androidx.room.Database
 import androidx.room.Room
