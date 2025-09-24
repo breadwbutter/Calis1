@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.example.calis1"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.example.calis1"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -53,9 +53,9 @@ dependencies {
     implementation(libs.androidx.material3)
 
     // Room - versiones compatibles
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    implementation("androidx.room:room-runtime:2.5.2")
+    implementation("androidx.room:room-ktx:2.5.2")
+    ksp("androidx.room:room-compiler:2.5.2")
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
