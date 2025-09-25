@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.example.calis1"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.calis1"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -51,6 +51,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Iconos extendidos para Visibility y VisibilityOff
+    implementation("androidx.compose.material:material-icons-extended:1.7.4")
 
     // Room - versiones compatibles
     implementation("androidx.room:room-runtime:2.5.2")

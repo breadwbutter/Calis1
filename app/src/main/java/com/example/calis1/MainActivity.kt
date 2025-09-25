@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -30,15 +31,33 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Calis1Theme {
-                UsuarioApp()
+                MainApp()
             }
         }
     }
 }
 
+@Composable
+fun MainApp() {
+    var isLoggedIn by remember { mutableStateOf(false) }
+
+    if (isLoggedIn) {
+        UsuarioApp(
+            onLogout = { isLoggedIn = false }
+        )
+    } else {
+        LoginScreen(
+            onLoginSuccess = { isLoggedIn = true }
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsuarioApp(viewModel: UsuarioViewModel = viewModel()) {
+fun UsuarioApp(
+    viewModel: UsuarioViewModel = viewModel(),
+    onLogout: () -> Unit
+) {
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
     val usuarios: List<Usuario> by viewModel.allUsuarios.observeAsState(emptyList())
@@ -46,7 +65,15 @@ fun UsuarioApp(viewModel: UsuarioViewModel = viewModel()) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Usuarios - Room + Firebase") }
+                title = { Text("Usuarios - Room + Firebase") },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Cerrar sesión"
+                        )
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -175,13 +202,8 @@ fun UsuarioItem(
 
 @Preview(showBackground = true)
 @Composable
-fun UsuarioAppPreview() {
+fun MainAppPreview() {
     Calis1Theme {
-        // Preview simple
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text("Vista previa de la aplicación")
-        }
+        MainApp()
     }
 }
