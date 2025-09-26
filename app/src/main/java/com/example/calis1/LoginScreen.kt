@@ -1,17 +1,22 @@
 package com.example.calis1
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -20,16 +25,35 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calis1.ui.theme.Calis1Theme
+import com.example.calis1.viewmodel.AuthViewModel
+import com.example.calis1.viewmodel.AuthState
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
+    authViewModel: AuthViewModel = viewModel(),
     onLoginSuccess: () -> Unit
 ) {
+    val context = LocalContext.current
+    val credentialManager = remember { CredentialManager.create(context) }
+    val coroutineScope = rememberCoroutineScope()
+    val authState by authViewModel.authState.collectAsState()
+
+    // Variables para el login tradicional
     var usuario by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+
+    // Observer para cambios en el estado de autenticación
+    LaunchedEffect(authState) {
+        if (authState is AuthState.SignedIn) {
+            onLoginSuccess()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -74,6 +98,58 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Manejo de estados de Google Sign-In
+                when (val currentState = authState) {
+                    is AuthState.Loading -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                        Text(
+                            text = "Iniciando sesión...",
+                            modifier = Modifier.align(Alignment.CenterHorizontally),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    is AuthState.Error -> {
+                        Text(
+                            text = currentState.message,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        GoogleSignInButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    authViewModel.signInWithGoogle(context, credentialManager)
+                                }
+                            }
+                        )
+                    }
+                    else -> {
+                        GoogleSignInButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    authViewModel.signInWithGoogle(context, credentialManager)
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // Divider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "  O  ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+
                 // Campo de usuario
                 OutlinedTextField(
                     value = usuario,
@@ -93,7 +169,7 @@ fun LoginScreen(
                     singleLine = true
                 )
 
-                // Campo de contraseña con iconos funcionando
+                // Campo de contraseña
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -121,7 +197,7 @@ fun LoginScreen(
                     singleLine = true
                 )
 
-                // Mensaje de error
+                // Mensaje de error para login tradicional
                 if (errorMessage.isNotEmpty()) {
                     Text(
                         text = errorMessage,
@@ -134,7 +210,7 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón de login
+                // Botón de login tradicional
                 Button(
                     onClick = {
                         when {
@@ -175,6 +251,45 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun GoogleSignInButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(50.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        shape = RoundedCornerShape(8.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White,
+            contentColor = Color.Black
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountCircle, // Puedes reemplazar con un icono de Google
+                contentDescription = "Google",
+                modifier = Modifier.size(20.dp),
+                tint = Color.Unspecified
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Continuar con Google",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.Black
+            )
         }
     }
 }
