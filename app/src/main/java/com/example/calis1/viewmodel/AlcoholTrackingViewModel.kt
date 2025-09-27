@@ -157,31 +157,91 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
     }
 
     /**
-     * Eliminar registro de un día específico
+     * Eliminar registro específico por ID
      */
-    fun eliminarRegistro(diaSemana: Int) {
+    fun eliminarRegistroEspecifico(registroId: String) {
         viewModelScope.launch {
             try {
                 _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-                val registro = repository.getRegistroPorDia(
-                    _currentUserId.value,
-                    _semanaActual.value.toString(),
-                    diaSemana
-                )
-
+                val registro = repository.getRegistroById(registroId)
                 if (registro != null) {
                     repository.deleteRegistro(registro)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        lastAction = "Registro eliminado para ${registro.getNombreDia()}"
+                        lastAction = "Registro eliminado"
                     )
                 } else {
-                    updateError("No hay registro para eliminar en este día")
+                    updateError("Registro no encontrado")
                 }
 
             } catch (e: Exception) {
                 updateError("Error al eliminar registro: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Editar registro específico
+     */
+    fun editarRegistro(
+        registroId: String,
+        nombreBebida: String,
+        mililitros: String,
+        porcentajeAlcohol: String
+    ) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+
+                // Validaciones (mismas que actualizarRegistro)
+                val ml = mililitros.toIntOrNull()
+                val porcentaje = porcentajeAlcohol.toDoubleOrNull()
+
+                when {
+                    nombreBebida.isBlank() -> {
+                        updateError("El nombre de la bebida no puede estar vacío")
+                        return@launch
+                    }
+                    ml == null || ml < 0 -> {
+                        updateError("Los mililitros deben ser un número válido mayor o igual a 0")
+                        return@launch
+                    }
+                    ml > 5000 -> {
+                        updateError("Los mililitros no pueden exceder 5000ml por día")
+                        return@launch
+                    }
+                    porcentaje == null || porcentaje < 0 -> {
+                        updateError("El porcentaje de alcohol debe ser un número válido mayor o igual a 0")
+                        return@launch
+                    }
+                    porcentaje > 100 -> {
+                        updateError("El porcentaje de alcohol no puede exceder 100%")
+                        return@launch
+                    }
+                }
+
+                val registroExistente = repository.getRegistroById(registroId)
+                if (registroExistente != null) {
+                    val registroActualizado = registroExistente.copy(
+                        nombreBebida = nombreBebida.trim(),
+                        mililitros = ml,
+                        porcentajeAlcohol = porcentaje,
+                        timestamp = System.currentTimeMillis() // Actualizar timestamp
+                    )
+
+                    repository.updateRegistro(registroActualizado)
+
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        lastAction = "Registro actualizado"
+                    )
+                } else {
+                    updateError("Registro no encontrado")
+                }
+
+            } catch (e: Exception) {
+                updateError("Error al actualizar registro: ${e.message}")
             }
         }
     }
@@ -197,13 +257,23 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
     }
 
     /**
-     * Navegar a semana siguiente
+     * Navegar a semana siguiente (SOLO si no es futuro)
      */
     fun irSemanaSiguiente() {
-        _semanaActual.value = _semanaActual.value.plusWeeks(1)
-        _uiState.value = _uiState.value.copy(
-            lastAction = "Navegando a semana siguiente"
-        )
+        val semanaActualReal = AlcoholRecord.getSemanaInicio()
+        val semanaSiguiente = _semanaActual.value.plusWeeks(1)
+
+        // RESTRICCIÓN: No permitir ir a semanas futuras
+        if (semanaSiguiente <= semanaActualReal) {
+            _semanaActual.value = semanaSiguiente
+            _uiState.value = _uiState.value.copy(
+                lastAction = "Navegando a semana siguiente"
+            )
+        } else {
+            _uiState.value = _uiState.value.copy(
+                error = "No puedes ver semanas futuras"
+            )
+        }
     }
 
     /**
@@ -217,12 +287,12 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
     }
 
     /**
-     * Crear mapa de registros organizados por día (1-7)
+     * Crear mapa de registros organizados por día (1-7) con MÚLTIPLES registros por día
      */
-    private fun crearMapaRegistrosPorDia(registros: List<AlcoholRecord>): Map<Int, AlcoholRecord?> {
-        val mapa = mutableMapOf<Int, AlcoholRecord?>()
+    private fun crearMapaRegistrosPorDia(registros: List<AlcoholRecord>): Map<Int, List<AlcoholRecord>> {
+        val mapa = mutableMapOf<Int, List<AlcoholRecord>>()
         for (i in 1..7) {
-            mapa[i] = registros.find { it.diaSemana == i }
+            mapa[i] = registros.filter { it.diaSemana == i }
         }
         return mapa
     }
@@ -280,7 +350,7 @@ data class AlcoholTrackingUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val lastAction: String? = null,
-    val registrosPorDia: Map<Int, AlcoholRecord?> = emptyMap(),
+    val registrosPorDia: Map<Int, List<AlcoholRecord>> = emptyMap(), // CAMBIO: Lista de registros por día
     val totalAlcoholPuro: Double = 0.0,
     val estadoSalud: EstadoSalud = EstadoSalud.SALUDABLE,
     val tieneRegistros: Boolean = false

@@ -8,14 +8,22 @@ import kotlinx.coroutines.flow.Flow
 interface AlcoholRecordDao {
 
     // Obtener todos los registros de una semana específica para un usuario
-    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC")
+    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC, timestamp ASC")
     fun getRegistrosSemana(userId: String, semanaInicio: String): Flow<List<AlcoholRecord>>
 
     // Obtener registros de una semana específica de forma síncrona (para sincronización)
-    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC")
+    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC, timestamp ASC")
     suspend fun getRegistrosSemanaSync(userId: String, semanaInicio: String): List<AlcoholRecord>
 
-    // Obtener un registro específico por día de la semana
+    // NUEVO: Obtener TODOS los registros de un día específico (múltiples registros por día)
+    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio AND diaSemana = :diaSemana ORDER BY timestamp ASC")
+    suspend fun getRegistrosPorDia(userId: String, semanaInicio: String, diaSemana: Int): List<AlcoholRecord>
+
+    // NUEVO: Obtener TODOS los registros de un día específico como Flow (reactivo)
+    @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio AND diaSemana = :diaSemana ORDER BY timestamp ASC")
+    fun getRegistrosPorDiaFlow(userId: String, semanaInicio: String, diaSemana: Int): Flow<List<AlcoholRecord>>
+
+    // Obtener un registro específico por día de la semana (DEPRECADO - mantenido por compatibilidad)
     @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio AND diaSemana = :diaSemana LIMIT 1")
     suspend fun getRegistroPorDia(userId: String, semanaInicio: String, diaSemana: Int): AlcoholRecord?
 

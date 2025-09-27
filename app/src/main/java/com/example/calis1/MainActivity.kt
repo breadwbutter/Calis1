@@ -149,14 +149,7 @@ fun MainAppScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("BeerBattle - ${if (currentScreen == "alcohol") "Control Semanal" else "Gestión Usuarios"}")
-                        Text(
-                            text = titlePrefix,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
+                    Text(if (currentScreen == "alcohol") "Control Semanal" else "BeerBattle - Gestión Usuarios")
                 },
                 actions = {
                     // Botón para cambiar entre pantallas
@@ -558,4 +551,3 @@ fun MainAppPreview() {
         MainApp()
     }
 }
-//111111111

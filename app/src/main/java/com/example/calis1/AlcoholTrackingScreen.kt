@@ -137,19 +137,22 @@ fun AlcoholTrackingScreen(
             // Días de la semana (Domingo a Sábado)
             items(7) { index ->
                 val diaSemana = index + 1 // 1=Domingo, 2=Lunes, etc.
-                val registro = uiState.registrosPorDia[diaSemana]
+                val registrosDia = uiState.registrosPorDia[diaSemana] ?: emptyList() // CAMBIO: Lista de registros
                 val fechaDia = semanaActual.plusDays(index.toLong())
 
                 DiaAlcoholCard(
                     diaSemana = diaSemana,
                     fecha = fechaDia,
-                    registro = registro,
+                    registros = registrosDia, // CAMBIO: Pasar lista de registros
                     isLoading = uiState.isLoading,
                     onActualizar = { nombre, ml, porcentaje ->
                         viewModel.actualizarRegistro(diaSemana, nombre, ml, porcentaje)
                     },
-                    onEliminar = {
-                        viewModel.eliminarRegistro(diaSemana)
+                    onEliminar = { registroId -> // CAMBIO: Eliminar por ID
+                        viewModel.eliminarRegistroEspecifico(registroId)
+                    },
+                    onEditar = { registroId, nombre, ml, porcentaje -> // NUEVO: Editar registro
+                        viewModel.editarRegistro(registroId, nombre, ml, porcentaje)
                     }
                 )
             }
@@ -252,12 +255,16 @@ fun SemanaNavigationCard(
                 }
 
                 IconButton(
-                    onClick = onSemanaSiguiente
+                    onClick = onSemanaSiguiente,
+                    enabled = !esSemanaActual // CAMBIO: Deshabilitar si ya estamos en semana actual
                 ) {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
                         contentDescription = "Semana siguiente",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        tint = if (esSemanaActual)
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.3f)
+                        else
+                            MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
@@ -360,22 +367,24 @@ fun ResumenAlcoholCard(
 fun DiaAlcoholCard(
     diaSemana: Int,
     fecha: LocalDate,
-    registro: AlcoholRecord?,
+    registros: List<AlcoholRecord>, // CAMBIO: Lista de registros en lugar de uno solo
     isLoading: Boolean,
     onActualizar: (String, String, String) -> Unit,
-    onEliminar: () -> Unit
+    onEliminar: (String) -> Unit, // CAMBIO: Eliminar por ID específico
+    onEditar: (String, String, String, String) -> Unit // NUEVO: Editar registro específico
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var nombreBebida by remember { mutableStateOf(registro?.nombreBebida ?: "") }
-    var mililitros by remember { mutableStateOf(registro?.mililitros?.toString() ?: "") }
-    var porcentajeAlcohol by remember { mutableStateOf(registro?.porcentajeAlcohol?.toString() ?: "") }
+    var editingRegistroId by remember { mutableStateOf<String?>(null) }
 
-    // Actualizar campos cuando cambie el registro
-    LaunchedEffect(registro) {
-        nombreBebida = registro?.nombreBebida ?: ""
-        mililitros = registro?.mililitros?.toString() ?: ""
-        porcentajeAlcohol = registro?.porcentajeAlcohol?.toString() ?: ""
-    }
+    // Estados para formulario (siempre limpios para nuevo registro)
+    var nombreBebida by remember { mutableStateOf("") }
+    var mililitros by remember { mutableStateOf("") }
+    var porcentajeAlcohol by remember { mutableStateOf("") }
+
+    // Estados para edición
+    var editNombreBebida by remember { mutableStateOf("") }
+    var editMililitros by remember { mutableStateOf("") }
+    var editPorcentajeAlcohol by remember { mutableStateOf("") }
 
     val nombreDia = when (diaSemana) {
         1 -> "Domingo"
@@ -388,11 +397,14 @@ fun DiaAlcoholCard(
         else -> "Día"
     }
 
+    // Calcular total de alcohol del día
+    val totalAlcoholDia = registros.sumOf { it.calcularAlcoholPuro() }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (registro != null)
+            containerColor = if (registros.isNotEmpty())
                 MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
             else
                 MaterialTheme.colorScheme.surface
@@ -420,13 +432,26 @@ fun DiaAlcoholCard(
                     )
                 }
 
-                Row {
-                    if (registro != null) {
-                        Text(
-                            text = "${String.format("%.1f", registro.calcularAlcoholPuro())} ml alcohol",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (registros.isNotEmpty()) {
+                        Column(
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                text = "${registros.size} registro${if (registros.size > 1) "s" else ""}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Text(
+                                text = "${String.format("%.1f", totalAlcoholDia)} ml alcohol",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                         IconButton(
                             onClick = { expanded = !expanded }
                         ) {
@@ -445,20 +470,165 @@ fun DiaAlcoholCard(
                 }
             }
 
-            // Resumen cuando está colapsado
-            if (registro != null && !expanded) {
+            // Lista de registros existentes (cuando está colapsado)
+            if (registros.isNotEmpty() && !expanded) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${registro.nombreBebida} • ${registro.mililitros}ml • ${registro.porcentajeAlcohol}%",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
+                registros.forEach { registro ->
+                    Text(
+                        text = "${registro.nombreBebida} • ${registro.mililitros}ml • ${registro.porcentajeAlcohol}%",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
             }
 
-            // Formulario expandido
+            // Contenido expandido
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Mostrar registros existentes con opciones de editar/eliminar
+                if (registros.isNotEmpty()) {
+                    Text(
+                        text = "Registros del día:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    registros.forEach { registro ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            )
+                        ) {
+                            if (editingRegistroId == registro.id) {
+                                // Modo edición
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = editNombreBebida,
+                                        onValueChange = { editNombreBebida = it },
+                                        label = { Text("Nombre") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = editMililitros,
+                                            onValueChange = { editMililitros = it },
+                                            label = { Text("ml") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+
+                                        OutlinedTextField(
+                                            value = editPorcentajeAlcohol,
+                                            onValueChange = { editPorcentajeAlcohol = it },
+                                            label = { Text("% Alcohol") },
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true
+                                        )
+                                    }
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                onEditar(registro.id, editNombreBebida, editMililitros, editPorcentajeAlcohol)
+                                                editingRegistroId = null
+                                            },
+                                            enabled = !isLoading
+                                        ) {
+                                            Text("Guardar")
+                                        }
+
+                                        TextButton(
+                                            onClick = { editingRegistroId = null }
+                                        ) {
+                                            Text("Cancelar")
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Modo visualización
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = registro.nombreBebida,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Text(
+                                            text = "${registro.mililitros}ml • ${registro.porcentajeAlcohol}% • ${String.format("%.1f", registro.calcularAlcoholPuro())}ml alcohol",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                    }
+
+                                    Row {
+                                        IconButton(
+                                            onClick = {
+                                                editingRegistroId = registro.id
+                                                editNombreBebida = registro.nombreBebida
+                                                editMililitros = registro.mililitros.toString()
+                                                editPorcentajeAlcohol = registro.porcentajeAlcohol.toString()
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Editar",
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+
+                                        IconButton(
+                                            onClick = { onEliminar(registro.id) },
+                                            enabled = !isLoading
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Eliminar",
+                                                tint = MaterialTheme.colorScheme.error
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Agregar nuevo registro:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Formulario para NUEVO registro (siempre limpio)
                 OutlinedTextField(
                     value = nombreBebida,
                     onValueChange = { nombreBebida = it },
@@ -504,7 +674,10 @@ fun DiaAlcoholCard(
                     Button(
                         onClick = {
                             onActualizar(nombreBebida, mililitros, porcentajeAlcohol)
-                            expanded = false
+                            // Limpiar formulario después de guardar
+                            nombreBebida = ""
+                            mililitros = ""
+                            porcentajeAlcohol = ""
                         },
                         modifier = Modifier.weight(1f),
                         enabled = !isLoading
@@ -515,27 +688,21 @@ fun DiaAlcoholCard(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("Guardar")
-                        }
-                    }
-
-                    if (registro != null) {
-                        OutlinedButton(
-                            onClick = {
-                                onEliminar()
-                                expanded = false
-                            },
-                            modifier = Modifier.weight(1f),
-                            enabled = !isLoading
-                        ) {
-                            Text("Eliminar")
+                            Text("Agregar")
                         }
                     }
 
                     TextButton(
-                        onClick = { expanded = false }
+                        onClick = {
+                            expanded = false
+                            editingRegistroId = null
+                            // Limpiar formulario al cancelar
+                            nombreBebida = ""
+                            mililitros = ""
+                            porcentajeAlcohol = ""
+                        }
                     ) {
-                        Text("Cancelar")
+                        Text("Cerrar")
                     }
                 }
             }

@@ -28,10 +28,31 @@ class AlcoholTrackingRepository(
     }
 
     /**
-     * Obtener registro específico por día
+     * Obtener registro específico por ID
      */
-    suspend fun getRegistroPorDia(userId: String, semanaInicio: String, diaSemana: Int): AlcoholRecord? {
-        return alcoholRecordDao.getRegistroPorDia(userId, semanaInicio, diaSemana)
+    suspend fun getRegistroById(registroId: String): AlcoholRecord? {
+        return alcoholRecordDao.getRegistroById(registroId)
+    }
+
+    /**
+     * Actualizar registro existente
+     */
+    suspend fun updateRegistro(registro: AlcoholRecord) {
+        try {
+            // Actualizar en Room primero
+            alcoholRecordDao.updateRegistro(registro)
+
+            // Intentar actualizar en Firebase
+            alcoholRecordsCollection.document(registro.id).set(registro.toMap()).await()
+
+            // Programar sincronización para asegurar consistencia
+            AlcoholSyncWorker.syncNow(context)
+
+        } catch (e: Exception) {
+            // Si Firebase falla, programar sincronización posterior
+            e.printStackTrace()
+            AlcoholSyncWorker.syncNow(context)
+        }
     }
 
     /**
