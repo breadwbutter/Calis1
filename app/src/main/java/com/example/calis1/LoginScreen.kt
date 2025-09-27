@@ -48,10 +48,18 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Observer para cambios en el estado de autenticación
+    // Observer para cambios en el estado de autenticación - SOLO para Google login
     LaunchedEffect(authState) {
-        if (authState is AuthState.SignedIn) {
-            onLoginSuccess()
+        when (authState) {
+            is AuthState.SignedIn -> {
+                onLoginSuccess()
+            }
+            is AuthState.Error -> {
+                errorMessage = (authState as AuthState.Error).message
+            }
+            else -> {
+                // No hacer nada para otros estados
+            }
         }
     }
 
@@ -99,7 +107,7 @@ fun LoginScreen(
                 )
 
                 // Manejo de estados de Google Sign-In
-                when (val currentState = authState) {
+                when (authState) {
                     is AuthState.Loading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                         Text(
@@ -108,30 +116,15 @@ fun LoginScreen(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                    is AuthState.Error -> {
-                        Text(
-                            text = currentState.message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        GoogleSignInButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    authViewModel.signInWithGoogle(context, credentialManager)
-                                }
-                            }
-                        )
-                    }
                     else -> {
                         GoogleSignInButton(
                             onClick = {
+                                errorMessage = ""
                                 coroutineScope.launch {
                                     authViewModel.signInWithGoogle(context, credentialManager)
                                 }
-                            }
+                            },
+                            enabled = authState !is AuthState.Loading
                         )
                     }
                 }
@@ -166,7 +159,8 @@ fun LoginScreen(
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = authState !is AuthState.Loading
                 )
 
                 // Campo de contraseña
@@ -194,10 +188,11 @@ fun LoginScreen(
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = authState !is AuthState.Loading
                 )
 
-                // Mensaje de error para login tradicional
+                // Mensaje de error
                 if (errorMessage.isNotEmpty()) {
                     Text(
                         text = errorMessage,
@@ -233,7 +228,8 @@ fun LoginScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = authState !is AuthState.Loading
                 ) {
                     Text(
                         text = "Iniciar Sesión",

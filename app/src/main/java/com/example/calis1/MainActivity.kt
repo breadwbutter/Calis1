@@ -16,14 +16,18 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.calis1.data.entity.Usuario
 import com.example.calis1.ui.theme.Calis1Theme
+import com.example.calis1.viewmodel.AuthViewModel
 import com.example.calis1.viewmodel.UsuarioViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,13 +44,25 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainApp() {
     var isLoggedIn by remember { mutableStateOf(false) }
+    val authViewModel: AuthViewModel = viewModel()
+    val context = LocalContext.current
+    val credentialManager = remember { CredentialManager.create(context) }
+    val coroutineScope = rememberCoroutineScope()
 
     if (isLoggedIn) {
         UsuarioApp(
-            onLogout = { isLoggedIn = false }
+            onLogout = {
+                coroutineScope.launch {
+                    // Primero hacer logout completo en el ViewModel
+                    authViewModel.signOut(credentialManager)
+                    // Luego cambiar el estado local
+                    isLoggedIn = false
+                }
+            }
         )
     } else {
         LoginScreen(
+            authViewModel = authViewModel,
             onLoginSuccess = { isLoggedIn = true }
         )
     }

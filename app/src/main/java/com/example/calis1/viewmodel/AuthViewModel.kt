@@ -17,22 +17,32 @@ import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.security.MessageDigest
 import java.util.*
 import com.example.calis1.R
 
 class AuthViewModel : ViewModel() {
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
+    private val _authState = MutableStateFlow<AuthState>(AuthState.SignedOut)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     private val auth = FirebaseAuth.getInstance()
 
-    init {
-        _authState.value = if (auth.currentUser != null) {
-            AuthState.SignedIn(auth.currentUser!!)
-        } else {
-            AuthState.SignedOut
+    // Login tradicional (sin Firebase)
+    fun signInTraditional(username: String, password: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            // Simular pequeño delay para mostrar loading
+            kotlinx.coroutines.delay(500)
+
+            // Validación simple
+            if (username == "admin" && password == "123456") {
+                _authState.value = AuthState.TraditionalSignedIn(username)
+            } else {
+                _authState.value = AuthState.Error("Usuario o contraseña incorrectos")
+            }
         }
     }
 
@@ -70,13 +80,13 @@ class AuthViewModel : ViewModel() {
             handleSignInResult(result)
 
         } catch (e: GetCredentialCancellationException) {
-            _authState.value = AuthState.Error("Sign-in cancelled by user")
+            _authState.value = AuthState.Error("Inicio de sesión cancelado por el usuario")
         } catch (e: NoCredentialException) {
-            _authState.value = AuthState.Error("No Google accounts found. Please add a Google account to your device.")
+            _authState.value = AuthState.Error("No se encontraron cuentas de Google. Por favor agrega una cuenta de Google a tu dispositivo.")
         } catch (e: GetCredentialException) {
-            _authState.value = AuthState.Error("Authentication failed: ${e.message}")
+            _authState.value = AuthState.Error("Error de autenticación: ${e.message}")
         } catch (e: Exception) {
-            _authState.value = AuthState.Error("Unexpected error: ${e.message}")
+            _authState.value = AuthState.Error("Error inesperado: ${e.message}")
         }
     }
 
@@ -97,11 +107,13 @@ class AuthViewModel : ViewModel() {
                         authResult.user?.let { user ->
                             _authState.value = AuthState.SignedIn(user)
                         } ?: run {
-                            _authState.value = AuthState.Error("Sign-in failed: User is null")
+                            _authState.value = AuthState.Error("Error al iniciar sesión: Usuario nulo")
                         }
 
                     } catch (e: GoogleIdTokenParsingException) {
-                        _authState.value = AuthState.Error("Invalid Google ID token")
+                        _authState.value = AuthState.Error("Token de Google ID inválido")
+                    } catch (e: Exception) {
+                        _authState.value = AuthState.Error("Error al autenticar con Firebase: ${e.message}")
                     }
                 }
             }
@@ -110,11 +122,31 @@ class AuthViewModel : ViewModel() {
 
     suspend fun signOut(credentialManager: CredentialManager) {
         try {
+            // Siempre limpiar Firebase Auth (por si había usuario de Google)
             auth.signOut()
-            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+
+            // Limpiar Credential Manager
+            try {
+                credentialManager.clearCredentialState(ClearCredentialStateRequest())
+            } catch (e: ClearCredentialException) {
+                // Log error but continue with logout
+                println("Error clearing credential state: ${e.message}")
+            }
+
+            // Limpiar estado local
             _authState.value = AuthState.SignedOut
-        } catch (e: ClearCredentialException) {
-            _authState.value = AuthState.Error("Sign-out failed: ${e.message}")
+
+        } catch (e: Exception) {
+            println("Error durante logout: ${e.message}")
+            // Forzar logout incluso si hay error
+            _authState.value = AuthState.SignedOut
+        }
+    }
+
+    // Método para limpiar errores
+    fun clearError() {
+        if (_authState.value is AuthState.Error) {
+            _authState.value = AuthState.SignedOut
         }
     }
 }
@@ -123,5 +155,6 @@ sealed class AuthState {
     object Loading : AuthState()
     object SignedOut : AuthState()
     data class SignedIn(val user: FirebaseUser) : AuthState()
+    data class TraditionalSignedIn(val username: String) : AuthState()
     data class Error(val message: String) : AuthState()
 }
