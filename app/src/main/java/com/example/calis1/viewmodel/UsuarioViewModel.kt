@@ -20,6 +20,9 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
 
         // Sincronizar datos al iniciar
         syncFromFirebase()
+
+        // Iniciar sincronización en tiempo real
+        startRealtimeSync()
     }
 
     fun insertUsuario(nombre: String, edad: Int) = viewModelScope.launch {
@@ -36,5 +39,21 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
 
     private fun syncFromFirebase() = viewModelScope.launch {
         repository.syncFromFirebase()
+    }
+
+    // Iniciar sincronización en tiempo real
+    private fun startRealtimeSync() = viewModelScope.launch {
+        repository.startRealtimeSync()
+    }
+
+    // Método para sincronización manual (opcional)
+    fun manualSync() = viewModelScope.launch {
+        repository.syncFromFirebase()
+    }
+
+    // Limpiar recursos cuando el ViewModel se destruya
+    override fun onCleared() {
+        super.onCleared()
+        repository.cleanup()
     }
 }

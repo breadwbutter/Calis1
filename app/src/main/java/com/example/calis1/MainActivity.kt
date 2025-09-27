@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
@@ -76,13 +77,40 @@ fun UsuarioApp(
 ) {
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
+    var isSync by remember { mutableStateOf(false) }
     val usuarios: List<Usuario> by viewModel.allUsuarios.observeAsState(emptyList())
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Usuarios - Room + Firebase") },
                 actions = {
+                    // Botón de sincronización manual
+                    IconButton(
+                        onClick = {
+                            isSync = true
+                            coroutineScope.launch {
+                                viewModel.manualSync()
+                                isSync = false
+                            }
+                        },
+                        enabled = !isSync
+                    ) {
+                        if (isSync) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Sincronizar manualmente"
+                            )
+                        }
+                    }
+
+                    // Botón de logout
                     IconButton(onClick = onLogout) {
                         Icon(
                             imageVector = Icons.Default.ExitToApp,
@@ -100,6 +128,21 @@ fun UsuarioApp(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Mensaje informativo sobre sincronización
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = "✨ Los datos se sincronizan automáticamente en tiempo real con Firebase",
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+
             // Formulario de entrada
             Card(
                 modifier = Modifier.fillMaxWidth(),

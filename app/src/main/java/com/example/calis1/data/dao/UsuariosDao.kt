@@ -9,6 +9,10 @@ interface UsuarioDao {
     @Query("SELECT * FROM usuarios ORDER BY timestamp DESC")
     fun getAllUsuarios(): LiveData<List<Usuario>>
 
+    // Método síncrono para obtener todos los usuarios (para sincronización)
+    @Query("SELECT * FROM usuarios ORDER BY timestamp DESC")
+    suspend fun getAllUsuariosSync(): List<Usuario>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUsuario(usuario: Usuario)
 
