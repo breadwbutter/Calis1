@@ -29,6 +29,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.calis1.data.entity.Usuario
 import com.example.calis1.ui.theme.Calis1Theme
+import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
 import com.example.calis1.viewmodel.UsuarioViewModel
 import kotlinx.coroutines.launch
@@ -47,28 +48,71 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainApp() {
-    var isLoggedIn by remember { mutableStateOf(false) }
     val authViewModel: AuthViewModel = viewModel()
     val context = LocalContext.current
-    val credentialManager = remember { CredentialManager.create(context) }
-    val coroutineScope = rememberCoroutineScope()
 
-    if (isLoggedIn) {
-        UsuarioApp(
-            onLogout = {
-                coroutineScope.launch {
-                    // Primero hacer logout completo en el ViewModel
-                    authViewModel.signOut(credentialManager)
-                    // Luego cambiar el estado local
-                    isLoggedIn = false
+    // Estados
+    val authState by authViewModel.authState.collectAsState()
+
+    // Inicializar el AuthViewModel con contexto
+    LaunchedEffect(Unit) {
+        println("🔍 DEBUG: MainActivity - Inicializando AuthViewModel...")
+        authViewModel.initialize(context)
+    }
+
+    // Determinar si mostrar la pantalla principal o login
+    when (authState) {
+        is AuthState.Loading -> {
+            println("🔍 DEBUG: MainActivity - Mostrando LoadingScreen")
+            // Mostrar pantalla de carga mientras verifica sesión
+            LoadingScreen()
+        }
+        is AuthState.SignedIn,
+        is AuthState.TraditionalSignedIn -> {
+            println("🔍 DEBUG: MainActivity - Mostrando UsuarioApp")
+            // Usuario logueado - mostrar pantalla principal
+            UsuarioApp(
+                authState = authState,
+                onLogout = {
+                    authViewModel.signOut(context)
                 }
-            }
-        )
-    } else {
-        LoginScreen(
-            authViewModel = authViewModel,
-            onLoginSuccess = { isLoggedIn = true }
-        )
+            )
+        }
+        is AuthState.SignedOut,
+        is AuthState.Error -> {
+            println("🔍 DEBUG: MainActivity - Mostrando LoginScreen")
+            // Usuario no logueado - mostrar login
+            LoginScreen(
+                authViewModel = authViewModel,
+                onLoginSuccess = { /* El estado cambiará automáticamente */ }
+            )
+        }
+    }
+}
+
+@Composable
+fun LoadingScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Verificando sesión...",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "Si se demora mucho, verifica tu conexión",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
     }
 }
 
@@ -76,6 +120,7 @@ fun MainApp() {
 @Composable
 fun UsuarioApp(
     viewModel: UsuarioViewModel = viewModel(),
+    authState: AuthState,
     onLogout: () -> Unit
 ) {
     var nombre by remember { mutableStateOf("") }
@@ -101,6 +146,13 @@ fun UsuarioApp(
         }
     }
 
+    // Determinar título y usuario actual
+    val (titlePrefix, currentUser) = when (authState) {
+        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
+        is AuthState.TraditionalSignedIn -> "Local: ${authState.username}" to authState.username
+        else -> "Usuario" to "Desconocido"
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,7 +160,7 @@ fun UsuarioApp(
                     Column {
                         Text("Usuarios - Room + Firebase")
                         Text(
-                            text = "WorkManager: $workStatus",
+                            text = titlePrefix,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -173,31 +225,6 @@ fun UsuarioApp(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Mensaje informativo sobre sincronización
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "🔄 Sincronización Automática Activada",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Text(
-                        text = "• Tiempo real mientras la app está abierta\n• Cada 15 min en segundo plano con WorkManager\n• Al recuperar conectividad automáticamente",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-
             // Formulario de entrada
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -255,29 +282,17 @@ fun UsuarioApp(
                     fontWeight = FontWeight.Bold
                 )
 
-                // Indicador de estado de WorkManager
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = when (workStatus) {
-                            "Sincronizando..." -> MaterialTheme.colorScheme.primary
-                            "Completado" -> MaterialTheme.colorScheme.tertiary
-                            "Programado" -> MaterialTheme.colorScheme.secondary
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    )
-                ) {
-                    Text(
-                        text = workStatus,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = when (workStatus) {
-                            "Sincronizando..." -> MaterialTheme.colorScheme.onPrimary
-                            "Completado" -> MaterialTheme.colorScheme.onTertiary
-                            "Programado" -> MaterialTheme.colorScheme.onSecondary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                }
+                // Indicador discreto de WorkManager
+                Text(
+                    text = workStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (workStatus) {
+                        "Sincronizando..." -> MaterialTheme.colorScheme.primary
+                        "Completado" -> MaterialTheme.colorScheme.tertiary
+                        "Programado" -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    }
+                )
             }
 
             LazyColumn(

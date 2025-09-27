@@ -35,11 +35,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel = viewModel(),
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit = {} // Ahora es opcional, el estado se maneja automáticamente
 ) {
     val context = LocalContext.current
-    val credentialManager = remember { CredentialManager.create(context) }
-    val coroutineScope = rememberCoroutineScope()
     val authState by authViewModel.authState.collectAsState()
 
     // Variables para el login tradicional
@@ -48,17 +46,28 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
-    // Observer para cambios en el estado de autenticación - SOLO para Google login
+    // Limpiar error cuando cambia el estado
     LaunchedEffect(authState) {
+        println("🔍 DEBUG: Estado cambiado a: $authState")
         when (authState) {
-            is AuthState.SignedIn -> {
-                onLoginSuccess()
-            }
             is AuthState.Error -> {
+                println("❌ DEBUG: Error en estado: ${(authState as AuthState.Error).message}")
                 errorMessage = (authState as AuthState.Error).message
             }
-            else -> {
-                // No hacer nada para otros estados
+            is AuthState.Loading -> {
+                println("🔄 DEBUG: Estado Loading")
+            }
+            is AuthState.SignedIn -> {
+                println("✅ DEBUG: SignedIn con usuario: ${(authState as AuthState.SignedIn).user.email}")
+            }
+            is AuthState.TraditionalSignedIn -> {
+                println("✅ DEBUG: TraditionalSignedIn con usuario: ${(authState as AuthState.TraditionalSignedIn).username}")
+            }
+            is AuthState.SignedOut -> {
+                println("🔓 DEBUG: SignedOut")
+                if (errorMessage.isNotEmpty()) {
+                    errorMessage = ""
+                }
             }
         }
     }
@@ -119,10 +128,16 @@ fun LoginScreen(
                     else -> {
                         GoogleSignInButton(
                             onClick = {
+                                println("🔍 DEBUG: Click en botón de Google")
                                 errorMessage = ""
-                                coroutineScope.launch {
-                                    authViewModel.signInWithGoogle(context, credentialManager)
-                                }
+                                // Limpiar sesión anterior antes de hacer login con Google
+                                authViewModel.clearPreviousSession()
+                                println("🔍 DEBUG: Sesión anterior limpiada")
+
+                                // Ahora llamar directamente al ViewModel (no suspend)
+                                println("🔍 DEBUG: Llamando signInWithGoogle...")
+                                authViewModel.signInWithGoogle(context)
+                                println("🔍 DEBUG: signInWithGoogle llamado")
                             },
                             enabled = authState !is AuthState.Loading
                         )
@@ -149,6 +164,7 @@ fun LoginScreen(
                     onValueChange = {
                         usuario = it
                         errorMessage = ""
+                        authViewModel.clearError()
                     },
                     label = { Text("Usuario") },
                     leadingIcon = {
@@ -169,6 +185,7 @@ fun LoginScreen(
                     onValueChange = {
                         password = it
                         errorMessage = ""
+                        authViewModel.clearError()
                     },
                     label = { Text("Contraseña") },
                     leadingIcon = {
@@ -216,12 +233,9 @@ fun LoginScreen(
                                 errorMessage = "Por favor ingresa tu contraseña"
                             }
                             else -> {
-                                // Validación simple
-                                if (usuario == "admin" && password == "123456") {
-                                    onLoginSuccess()
-                                } else {
-                                    errorMessage = "Usuario o contraseña incorrectos"
-                                }
+                                // Limpiar sesión anterior antes de hacer login tradicional
+                                authViewModel.clearPreviousSession()
+                                authViewModel.signInTraditional(usuario, password)
                             }
                         }
                     },
@@ -239,13 +253,24 @@ fun LoginScreen(
                 }
 
                 // Información de credenciales de prueba
-                Text(
-                    text = "Usuario: admin\nContraseña: 123456",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Column {
+                    Text(
+                        text = "Usuario: admin\nContraseña: 123456",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Debug: Mostrar web_client_id para verificar configuración
+                    Text(
+                        text = "Web Client ID: ${context.getString(R.string.web_client_id).take(20)}...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
