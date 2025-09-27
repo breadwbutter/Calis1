@@ -12,6 +12,12 @@ class SessionManager(context: Context) {
         Context.MODE_PRIVATE
     )
 
+    // SharedPreferences separado para usuarios registrados
+    private val userPrefs: SharedPreferences = context.getSharedPreferences(
+        "registered_users",
+        Context.MODE_PRIVATE
+    )
+
     private val auth = FirebaseAuth.getInstance()
 
     companion object {
@@ -24,12 +30,73 @@ class SessionManager(context: Context) {
         // Tipos de login
         const val LOGIN_TYPE_TRADITIONAL = "traditional"
         const val LOGIN_TYPE_GOOGLE = "google"
+        const val LOGIN_TYPE_EMAIL = "email"
+    }
+
+    /**
+     * Registrar nuevo usuario con email y contraseña
+     */
+    fun registerUser(email: String, password: String): RegisterResult {
+        // Validar formato de email
+        if (!isValidEmail(email)) {
+            return RegisterResult.InvalidEmail
+        }
+
+        // Validar contraseña (mínimo 6 caracteres)
+        if (password.length < 6) {
+            return RegisterResult.WeakPassword
+        }
+
+        // Verificar si el email ya está registrado
+        if (userPrefs.contains(email)) {
+            return RegisterResult.EmailAlreadyExists
+        }
+
+        // Guardar usuario (en producción deberías hashear la contraseña)
+        userPrefs.edit().apply {
+            putString(email, password)
+            apply()
+        }
+
+        return RegisterResult.Success
+    }
+
+    /**
+     * Verificar credenciales de usuario registrado
+     */
+    fun verifyUserCredentials(email: String, password: String): Boolean {
+        val storedPassword = userPrefs.getString(email, null)
+        return storedPassword == password
+    }
+
+    /**
+     * Validar formato de email
+     */
+    fun isValidEmail(email: String): Boolean {
+        return email.contains("@") &&
+                email.indexOf("@") > 0 &&
+                email.indexOf("@") < email.length - 1 &&
+                email.count { it == '@' } == 1
+    }
+
+    /**
+     * Obtener lista de usuarios registrados (solo emails)
+     */
+    fun getRegisteredEmails(): Set<String> {
+        return userPrefs.all.keys
+    }
+
+    /**
+     * Verificar si un email está registrado
+     */
+    fun isEmailRegistered(email: String): Boolean {
+        return userPrefs.contains(email)
     }
 
     /**
      * Guardar sesión después de login exitoso
      */
-    fun saveSession(loginType: String, username: String? = null, user: FirebaseUser? = null) {
+    fun saveSession(loginType: String, username: String? = null, user: FirebaseUser? = null, email: String? = null) {
         prefs.edit().apply {
             putBoolean(KEY_IS_LOGGED_IN, true)
             putString(KEY_LOGIN_TYPE, loginType)
@@ -37,11 +104,16 @@ class SessionManager(context: Context) {
             when (loginType) {
                 LOGIN_TYPE_TRADITIONAL -> {
                     putString(KEY_USERNAME, username ?: "")
+                    putString(KEY_USER_EMAIL, email ?: "")
                 }
                 LOGIN_TYPE_GOOGLE -> {
                     putString(KEY_USER_EMAIL, user?.email ?: "")
                     putString(KEY_USER_ID, user?.uid ?: "")
                     putString(KEY_USERNAME, user?.displayName ?: user?.email ?: "")
+                }
+                LOGIN_TYPE_EMAIL -> {
+                    putString(KEY_USER_EMAIL, email ?: "")
+                    putString(KEY_USERNAME, email?.substringBefore("@") ?: "")
                 }
             }
             apply()
@@ -56,8 +128,8 @@ class SessionManager(context: Context) {
         val loginType = getLoginType()
 
         return when (loginType) {
-            LOGIN_TYPE_TRADITIONAL -> {
-                // Para login tradicional, solo verificar local
+            LOGIN_TYPE_TRADITIONAL, LOGIN_TYPE_EMAIL -> {
+                // Para login tradicional y email, solo verificar local
                 hasLocalSession
             }
             LOGIN_TYPE_GOOGLE -> {
@@ -114,6 +186,16 @@ class SessionManager(context: Context) {
         }
 
         return isLoggedIn()
+    }
+
+    /**
+     * Resultados del registro
+     */
+    sealed class RegisterResult {
+        object Success : RegisterResult()
+        object InvalidEmail : RegisterResult()
+        object WeakPassword : RegisterResult()
+        object EmailAlreadyExists : RegisterResult()
     }
 
     /**

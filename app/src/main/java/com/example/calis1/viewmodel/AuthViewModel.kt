@@ -72,6 +72,10 @@ class AuthViewModel : ViewModel() {
                             println("🔍 DEBUG: Restaurando sesión tradicional: ${userData.username}")
                             _authState.value = AuthState.TraditionalSignedIn(userData.username)
                         }
+                        SessionManager.LOGIN_TYPE_EMAIL -> {
+                            println("🔍 DEBUG: Restaurando sesión email: ${userData.email}")
+                            _authState.value = AuthState.EmailSignedIn(userData.email, userData.username)
+                        }
                         SessionManager.LOGIN_TYPE_GOOGLE -> {
                             userData.firebaseUser?.let { user ->
                                 println("🔍 DEBUG: Restaurando sesión Google: ${user.email}")
@@ -99,37 +103,143 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
-     * Limpiar sesión anterior (para cambio de tipo de login)
+     * Registrar nuevo usuario con email y contraseña
      */
-    fun clearPreviousSession() {
-        println("🔍 DEBUG: Limpiando sesión anterior...")
-        sessionManager?.clearSession()
-        println("🔍 DEBUG: Sesión anterior limpiada")
+    fun registerUser(email: String, password: String, confirmPassword: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            // Simular pequeño delay para mostrar loading
+            kotlinx.coroutines.delay(300)
+
+            // Validaciones
+            when {
+                email.isBlank() -> {
+                    _authState.value = AuthState.Error("Por favor ingresa un email")
+                    return@launch
+                }
+                !sessionManager?.isValidEmail(email)!! -> {
+                    _authState.value = AuthState.Error("El email debe contener un @ válido")
+                    return@launch
+                }
+                email.trim() == "admin@gmail.com" -> {
+                    _authState.value = AuthState.Error("Este email está reservado para el administrador")
+                    return@launch
+                }
+                password.isBlank() -> {
+                    _authState.value = AuthState.Error("Por favor ingresa una contraseña")
+                    return@launch
+                }
+                password.length < 6 -> {
+                    _authState.value = AuthState.Error("La contraseña debe tener al menos 6 caracteres")
+                    return@launch
+                }
+                password != confirmPassword -> {
+                    _authState.value = AuthState.Error("Las contraseñas no coinciden")
+                    return@launch
+                }
+            }
+
+            // Intentar registrar
+            val result = sessionManager?.registerUser(email.trim(), password)
+
+            when (result) {
+                SessionManager.RegisterResult.Success -> {
+                    _authState.value = AuthState.RegistrationSuccess("Usuario registrado exitosamente. Ahora puedes iniciar sesión.")
+                }
+                SessionManager.RegisterResult.InvalidEmail -> {
+                    _authState.value = AuthState.Error("El formato del email no es válido")
+                }
+                SessionManager.RegisterResult.WeakPassword -> {
+                    _authState.value = AuthState.Error("La contraseña debe tener al menos 6 caracteres")
+                }
+                SessionManager.RegisterResult.EmailAlreadyExists -> {
+                    _authState.value = AuthState.Error("Este email ya está registrado")
+                }
+                null -> {
+                    _authState.value = AuthState.Error("Error interno del sistema")
+                }
+            }
+        }
     }
 
     /**
-     * Login tradicional (sin Firebase) con persistencia
+     * Login con email registrado
      */
-    fun signInTraditional(username: String, password: String) {
+    fun signInWithEmail(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
 
             // Simular pequeño delay para mostrar loading
             kotlinx.coroutines.delay(500)
 
-            // Validación simple
-            if (username == "admin" && password == "123456") {
+            // Validaciones básicas
+            when {
+                email.isBlank() -> {
+                    _authState.value = AuthState.Error("Por favor ingresa tu email")
+                    return@launch
+                }
+                password.isBlank() -> {
+                    _authState.value = AuthState.Error("Por favor ingresa tu contraseña")
+                    return@launch
+                }
+                !sessionManager?.isValidEmail(email)!! -> {
+                    _authState.value = AuthState.Error("El formato del email no es válido")
+                    return@launch
+                }
+            }
+
+            // Verificar credenciales
+            val isValid = sessionManager?.verifyUserCredentials(email.trim(), password) ?: false
+
+            if (isValid) {
+                // Guardar sesión
+                sessionManager?.saveSession(
+                    loginType = SessionManager.LOGIN_TYPE_EMAIL,
+                    email = email.trim()
+                )
+
+                val username = email.substringBefore("@")
+                _authState.value = AuthState.EmailSignedIn(email.trim(), username)
+            } else {
+                _authState.value = AuthState.Error("Email o contraseña incorrectos")
+            }
+        }
+    }
+
+    /**
+     * Login tradicional (admin@gmail.com / 123456)
+     */
+    fun signInTraditional(email: String, password: String) {
+        viewModelScope.launch {
+            _authState.value = AuthState.Loading
+
+            // Simular pequeño delay para mostrar loading
+            kotlinx.coroutines.delay(500)
+
+            // Validación simple tradicional (admin@gmail.com/123456)
+            if (email == "admin@gmail.com" && password == "123456") {
                 // Guardar sesión
                 sessionManager?.saveSession(
                     loginType = SessionManager.LOGIN_TYPE_TRADITIONAL,
-                    username = username
+                    username = "admin",
+                    email = email
                 )
 
-                _authState.value = AuthState.TraditionalSignedIn(username)
+                _authState.value = AuthState.TraditionalSignedIn("admin")
             } else {
-                _authState.value = AuthState.Error("Usuario o contraseña incorrectos")
+                _authState.value = AuthState.Error("Email o contraseña incorrectos")
             }
         }
+    }
+
+    /**
+     * Limpiar sesión anterior (para cambio de tipo de login)
+     */
+    fun clearPreviousSession() {
+        println("🔍 DEBUG: Limpiando sesión anterior...")
+        sessionManager?.clearSession()
+        println("🔍 DEBUG: Sesión anterior limpiada")
     }
 
     /**
@@ -326,6 +436,20 @@ class AuthViewModel : ViewModel() {
     fun getCurrentUserData(): SessionManager.SessionData? {
         return sessionManager?.getUserData()
     }
+
+    /**
+     * Validar email en tiempo real
+     */
+    fun isValidEmail(email: String): Boolean {
+        return sessionManager?.isValidEmail(email) ?: false
+    }
+
+    /**
+     * Verificar si un email ya está registrado
+     */
+    fun isEmailRegistered(email: String): Boolean {
+        return sessionManager?.isEmailRegistered(email) ?: false
+    }
 }
 
 sealed class AuthState {
@@ -333,5 +457,7 @@ sealed class AuthState {
     object SignedOut : AuthState()
     data class SignedIn(val user: FirebaseUser) : AuthState()
     data class TraditionalSignedIn(val username: String) : AuthState()
+    data class EmailSignedIn(val email: String, val username: String) : AuthState()
     data class Error(val message: String) : AuthState()
+    data class RegistrationSuccess(val message: String) : AuthState()
 }

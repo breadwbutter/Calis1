@@ -6,8 +6,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -40,19 +40,42 @@ fun LoginScreen(
     val context = LocalContext.current
     val authState by authViewModel.authState.collectAsState()
 
-    // Variables para el login tradicional
-    var usuario by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
+    // Estado para alternar entre login y registro
+    var isLoginMode by remember { mutableStateOf(true) }
 
-    // Limpiar error cuando cambia el estado
+    // Variables para el formulario
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    var successMessage by remember { mutableStateOf("") }
+
+    // Validaciones en tiempo real
+    var emailError by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf("") }
+    var confirmPasswordError by remember { mutableStateOf("") }
+
+    // Limpiar mensajes cuando cambia el estado
     LaunchedEffect(authState) {
         println("🔍 DEBUG: Estado cambiado a: $authState")
         when (authState) {
             is AuthState.Error -> {
                 println("❌ DEBUG: Error en estado: ${(authState as AuthState.Error).message}")
                 errorMessage = (authState as AuthState.Error).message
+                successMessage = ""
+            }
+            is AuthState.RegistrationSuccess -> {
+                println("✅ DEBUG: Registro exitoso: ${(authState as AuthState.RegistrationSuccess).message}")
+                successMessage = (authState as AuthState.RegistrationSuccess).message
+                errorMessage = ""
+                // Cambiar a modo login después de registro exitoso
+                isLoginMode = true
+                // Limpiar formulario
+                email = ""
+                password = ""
+                confirmPassword = ""
             }
             is AuthState.Loading -> {
                 println("🔄 DEBUG: Estado Loading")
@@ -63,12 +86,50 @@ fun LoginScreen(
             is AuthState.TraditionalSignedIn -> {
                 println("✅ DEBUG: TraditionalSignedIn con usuario: ${(authState as AuthState.TraditionalSignedIn).username}")
             }
+            is AuthState.EmailSignedIn -> {
+                println("✅ DEBUG: EmailSignedIn con email: ${(authState as AuthState.EmailSignedIn).email}")
+            }
             is AuthState.SignedOut -> {
                 println("🔓 DEBUG: SignedOut")
-                if (errorMessage.isNotEmpty()) {
+                if (errorMessage.isNotEmpty() && authState !is AuthState.Error) {
                     errorMessage = ""
                 }
+                if (successMessage.isNotEmpty()) {
+                    successMessage = ""
+                }
             }
+        }
+    }
+
+    // Limpiar mensajes de éxito después de 5 segundos
+    LaunchedEffect(successMessage) {
+        if (successMessage.isNotEmpty()) {
+            kotlinx.coroutines.delay(5000)
+            successMessage = ""
+        }
+    }
+
+    // Validaciones en tiempo real
+    LaunchedEffect(email) {
+        emailError = when {
+            email.isNotEmpty() && !authViewModel.isValidEmail(email) -> "El email debe contener un @ válido"
+            email.isNotEmpty() && !isLoginMode && email == "admin@gmail.com" -> "Este email está reservado"
+            email.isNotEmpty() && !isLoginMode && email != "admin@gmail.com" && authViewModel.isEmailRegistered(email) -> "Este email ya está registrado"
+            else -> ""
+        }
+    }
+
+    LaunchedEffect(password) {
+        passwordError = when {
+            password.isNotEmpty() && password.length < 6 -> "Mínimo 6 caracteres"
+            else -> ""
+        }
+    }
+
+    LaunchedEffect(confirmPassword, password) {
+        confirmPasswordError = when {
+            !isLoginMode && confirmPassword.isNotEmpty() && confirmPassword != password -> "Las contraseñas no coinciden"
+            else -> ""
         }
     }
 
@@ -89,7 +150,7 @@ fun LoginScreen(
         )
 
         Text(
-            text = "Bienvenido",
+            text = if (isLoginMode) "Bienvenido" else "Crear cuenta",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
             modifier = Modifier.padding(bottom = 32.dp)
@@ -108,19 +169,63 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Iniciar Sesión",
+                    text = if (isLoginMode) "Iniciar Sesión" else "Registrarse",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Selector de modo
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(
+                        onClick = {
+                            isLoginMode = true
+                            errorMessage = ""
+                            successMessage = ""
+                            authViewModel.clearError()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = if (isLoginMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Text(
+                            text = "Iniciar Sesión",
+                            fontWeight = if (isLoginMode) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+
+                    TextButton(
+                        onClick = {
+                            isLoginMode = false
+                            errorMessage = ""
+                            successMessage = ""
+                            authViewModel.clearError()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = if (!isLoginMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    ) {
+                        Text(
+                            text = "Registrarse",
+                            fontWeight = if (!isLoginMode) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
                 // Manejo de estados de Google Sign-In
                 when (authState) {
                     is AuthState.Loading -> {
                         CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                         Text(
-                            text = "Iniciando sesión...",
+                            text = if (isLoginMode) "Iniciando sesión..." else "Registrando usuario...",
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -130,11 +235,12 @@ fun LoginScreen(
                             onClick = {
                                 println("🔍 DEBUG: Click en botón de Google")
                                 errorMessage = ""
+                                successMessage = ""
                                 // Limpiar sesión anterior antes de hacer login con Google
                                 authViewModel.clearPreviousSession()
                                 println("🔍 DEBUG: Sesión anterior limpiada")
 
-                                // Ahora llamar directamente al ViewModel (no suspend)
+                                // Ahora llamar directamente al ViewModel
                                 println("🔍 DEBUG: Llamando signInWithGoogle...")
                                 authViewModel.signInWithGoogle(context)
                                 println("🔍 DEBUG: signInWithGoogle llamado")
@@ -158,25 +264,30 @@ fun LoginScreen(
                     HorizontalDivider(modifier = Modifier.weight(1f))
                 }
 
-                // Campo de usuario
+                // Campo de email (para registro y login)
                 OutlinedTextField(
-                    value = usuario,
+                    value = email,
                     onValueChange = {
-                        usuario = it
+                        email = it
                         errorMessage = ""
+                        successMessage = ""
                         authViewModel.clearError()
                     },
-                    label = { Text("Usuario") },
+                    label = { Text("Email") },
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Usuario"
+                            imageVector = Icons.Default.Email,
+                            contentDescription = "Email"
                         )
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = authState !is AuthState.Loading
+                    enabled = authState !is AuthState.Loading,
+                    isError = emailError.isNotEmpty(),
+                    supportingText = if (emailError.isNotEmpty()) {
+                        { Text(emailError, color = MaterialTheme.colorScheme.error) }
+                    } else null
                 )
 
                 // Campo de contraseña
@@ -185,6 +296,7 @@ fun LoginScreen(
                     onValueChange = {
                         password = it
                         errorMessage = ""
+                        successMessage = ""
                         authViewModel.clearError()
                     },
                     label = { Text("Contraseña") },
@@ -206,8 +318,49 @@ fun LoginScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = authState !is AuthState.Loading
+                    enabled = authState !is AuthState.Loading,
+                    isError = passwordError.isNotEmpty(),
+                    supportingText = if (passwordError.isNotEmpty()) {
+                        { Text(passwordError, color = MaterialTheme.colorScheme.error) }
+                    } else null
                 )
+
+                // Campo de confirmar contraseña (solo para registro)
+                if (!isLoginMode) {
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = {
+                            confirmPassword = it
+                            errorMessage = ""
+                            successMessage = ""
+                            authViewModel.clearError()
+                        },
+                        label = { Text("Confirmar contraseña") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Confirmar contraseña"
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (confirmPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = if (confirmPasswordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+                                )
+                            }
+                        },
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = authState !is AuthState.Loading,
+                        isError = confirmPasswordError.isNotEmpty(),
+                        supportingText = if (confirmPasswordError.isNotEmpty()) {
+                            { Text(confirmPasswordError, color = MaterialTheme.colorScheme.error) }
+                        } else null
+                    )
+                }
 
                 // Mensaje de error
                 if (errorMessage.isNotEmpty()) {
@@ -220,22 +373,60 @@ fun LoginScreen(
                     )
                 }
 
+                // Mensaje de éxito
+                if (successMessage.isNotEmpty()) {
+                    Text(
+                        text = successMessage,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Botón de login tradicional
+                // Botón principal
                 Button(
                     onClick = {
-                        when {
-                            usuario.isBlank() -> {
-                                errorMessage = "Por favor ingresa tu usuario"
+                        if (isLoginMode) {
+                            // Lógica de login
+                            when {
+                                email.isBlank() -> {
+                                    errorMessage = "Por favor ingresa tu email"
+                                }
+                                password.isBlank() -> {
+                                    errorMessage = "Por favor ingresa tu contraseña"
+                                }
+                                email == "admin@gmail.com" -> {
+                                    // Login tradicional para admin
+                                    authViewModel.clearPreviousSession()
+                                    authViewModel.signInTraditional(email, password)
+                                }
+                                else -> {
+                                    // Login con email registrado
+                                    authViewModel.clearPreviousSession()
+                                    authViewModel.signInWithEmail(email, password)
+                                }
                             }
-                            password.isBlank() -> {
-                                errorMessage = "Por favor ingresa tu contraseña"
-                            }
-                            else -> {
-                                // Limpiar sesión anterior antes de hacer login tradicional
-                                authViewModel.clearPreviousSession()
-                                authViewModel.signInTraditional(usuario, password)
+                        } else {
+                            // Lógica de registro
+                            when {
+                                email.isBlank() -> {
+                                    errorMessage = "Por favor ingresa tu email"
+                                }
+                                password.isBlank() -> {
+                                    errorMessage = "Por favor ingresa tu contraseña"
+                                }
+                                confirmPassword.isBlank() -> {
+                                    errorMessage = "Por favor confirma tu contraseña"
+                                }
+                                emailError.isNotEmpty() || passwordError.isNotEmpty() || confirmPasswordError.isNotEmpty() -> {
+                                    errorMessage = "Por favor corrige los errores antes de continuar"
+                                }
+                                else -> {
+                                    authViewModel.registerUser(email, password, confirmPassword)
+                                }
                             }
                         }
                     },
@@ -246,27 +437,26 @@ fun LoginScreen(
                     enabled = authState !is AuthState.Loading
                 ) {
                     Text(
-                        text = "Iniciar Sesión",
+                        text = if (isLoginMode) "Iniciar Sesión" else "Registrarse",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
 
-                // Información de credenciales de prueba
-                Column {
+                // Información adicional
+                if (isLoginMode) {
                     Text(
-                        text = "Usuario: admin\nContraseña: 123456",
+                        text = "Usa tu email registrado o admin@gmail.com (contraseña: 123456)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    // Debug: Mostrar web_client_id para verificar configuración
+                } else {
                     Text(
-                        text = "Web Client ID: ${context.getString(R.string.web_client_id).take(20)}...",
+                        text = "Al registrarte podrás usar tu email para iniciar sesión",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )

@@ -68,7 +68,8 @@ fun MainApp() {
             LoadingScreen()
         }
         is AuthState.SignedIn,
-        is AuthState.TraditionalSignedIn -> {
+        is AuthState.TraditionalSignedIn,
+        is AuthState.EmailSignedIn -> {
             println("🔍 DEBUG: MainActivity - Mostrando UsuarioApp")
             // Usuario logueado - mostrar pantalla principal
             UsuarioApp(
@@ -79,7 +80,8 @@ fun MainApp() {
             )
         }
         is AuthState.SignedOut,
-        is AuthState.Error -> {
+        is AuthState.Error,
+        is AuthState.RegistrationSuccess -> {
             println("🔍 DEBUG: MainActivity - Mostrando LoginScreen")
             // Usuario no logueado - mostrar login
             LoginScreen(
@@ -157,10 +159,11 @@ fun UsuarioApp(
         }
     }
 
-    // Determinar título y usuario actual
+    // Determinar título y usuario actual basado en el tipo de autenticación
     val (titlePrefix, currentUser) = when (authState) {
         is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
-        is AuthState.TraditionalSignedIn -> "Local: ${authState.username}" to authState.username
+        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin@gmail.com"
+        is AuthState.EmailSignedIn -> "Email: ${authState.username}" to authState.email
         else -> "Usuario" to "Desconocido"
     }
 
