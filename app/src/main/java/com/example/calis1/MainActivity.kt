@@ -51,13 +51,22 @@ fun MainApp() {
     val authViewModel: AuthViewModel = viewModel()
     val context = LocalContext.current
 
-    // Estados
+    // NUEVO: Estado para controlar splash screen
+    var showSplash by remember { mutableStateOf(true) }
+
+    // Estados existentes
     val authState by authViewModel.authState.collectAsState()
 
-    // Inicializar el AuthViewModel con contexto
-    LaunchedEffect(Unit) {
-        println("🔍 DEBUG: MainActivity - Inicializando AuthViewModel...")
-        authViewModel.initialize(context)
+    // NUEVO: Mostrar splash screen primero
+    if (showSplash) {
+        SplashScreen(
+            onSplashFinished = {
+                showSplash = false
+                // Inicializar AuthViewModel después del splash
+                authViewModel.initialize(context)
+            }
+        )
+        return
     }
 
     // Determinar si mostrar la pantalla principal o login
@@ -172,7 +181,7 @@ fun UsuarioApp(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Usuarios - StateFlow + Firebase")
+                        Text("BeerBattle - Usuarios") // NUEVO: Cambié el título
                         Text(
                             text = "$titlePrefix • $usuariosCount usuarios",
                             style = MaterialTheme.typography.bodySmall,
@@ -404,7 +413,7 @@ fun UsuarioApp(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "📝",
+                                text = "🍺",
                                 style = MaterialTheme.typography.headlineLarge
                             )
                             Text(
@@ -413,7 +422,7 @@ fun UsuarioApp(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "Agrega el primer usuario",
+                                text = "Agrega el primer soldado",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
