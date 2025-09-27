@@ -69,6 +69,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.compose.runtime:runtime-livedata:1.7.4")
 
+    // WorkManager - NUEVA DEPENDENCIA
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

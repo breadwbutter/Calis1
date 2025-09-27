@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
@@ -24,6 +25,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import com.example.calis1.data.entity.Usuario
 import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AuthViewModel
@@ -77,27 +80,69 @@ fun UsuarioApp(
 ) {
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
-    var isSync by remember { mutableStateOf(false) }
+    var isManualSync by remember { mutableStateOf(false) }
     val usuarios: List<Usuario> by viewModel.allUsuarios.observeAsState(emptyList())
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
+    // Observar estado de WorkManager
+    val workManager = WorkManager.getInstance(context)
+    var workStatus by remember { mutableStateOf("Inactivo") }
+
+    LaunchedEffect(Unit) {
+        // Observar trabajos de sincronización
+        workManager.getWorkInfosForUniqueWorkLiveData("periodic_sync").observeForever { workInfos ->
+            workStatus = when {
+                workInfos.any { it.state == WorkInfo.State.RUNNING } -> "Sincronizando..."
+                workInfos.any { it.state == WorkInfo.State.ENQUEUED } -> "Programado"
+                workInfos.any { it.state == WorkInfo.State.SUCCEEDED } -> "Completado"
+                else -> "Inactivo"
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Usuarios - Room + Firebase") },
+                title = {
+                    Column {
+                        Text("Usuarios - Room + Firebase")
+                        Text(
+                            text = "WorkManager: $workStatus",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                },
                 actions = {
-                    // Botón de sincronización manual
+                    // Botón de sincronización con WorkManager
                     IconButton(
                         onClick = {
-                            isSync = true
+                            viewModel.forceSync()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CloudSync,
+                            contentDescription = "Sincronizar con WorkManager",
+                            tint = if (workStatus == "Sincronizando...")
+                                MaterialTheme.colorScheme.primary
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Botón de sincronización manual tradicional
+                    IconButton(
+                        onClick = {
+                            isManualSync = true
                             coroutineScope.launch {
                                 viewModel.manualSync()
-                                isSync = false
+                                isManualSync = false
                             }
                         },
-                        enabled = !isSync
+                        enabled = !isManualSync
                     ) {
-                        if (isSync) {
+                        if (isManualSync) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp
@@ -105,7 +150,7 @@ fun UsuarioApp(
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "Sincronizar manualmente"
+                                contentDescription = "Sincronización manual"
                             )
                         }
                     }
@@ -135,12 +180,22 @@ fun UsuarioApp(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             ) {
-                Text(
-                    text = "✨ Los datos se sincronizan automáticamente en tiempo real con Firebase",
+                Column(
                     modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "🔄 Sincronización Automática Activada",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = "• Tiempo real mientras la app está abierta\n• Cada 15 min en segundo plano con WorkManager\n• Al recuperar conectividad automáticamente",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
             }
 
             // Formulario de entrada
@@ -189,11 +244,41 @@ fun UsuarioApp(
             }
 
             // Lista de usuarios
-            Text(
-                text = "Usuarios Guardados (${usuarios.size})",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Usuarios Guardados (${usuarios.size})",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // Indicador de estado de WorkManager
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = when (workStatus) {
+                            "Sincronizando..." -> MaterialTheme.colorScheme.primary
+                            "Completado" -> MaterialTheme.colorScheme.tertiary
+                            "Programado" -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        }
+                    )
+                ) {
+                    Text(
+                        text = workStatus,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when (workStatus) {
+                            "Sincronizando..." -> MaterialTheme.colorScheme.onPrimary
+                            "Completado" -> MaterialTheme.colorScheme.onTertiary
+                            "Programado" -> MaterialTheme.colorScheme.onSecondary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+            }
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)

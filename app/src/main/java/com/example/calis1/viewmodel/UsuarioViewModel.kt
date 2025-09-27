@@ -15,14 +15,11 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val usuarioDao = AppDatabase.getDatabase(application).usuarioDao()
-        repository = UsuarioRepository(usuarioDao)
+        repository = UsuarioRepository(usuarioDao, application.applicationContext)
         allUsuarios = repository.getAllUsuarios()
 
-        // Sincronizar datos al iniciar
-        syncFromFirebase()
-
-        // Iniciar sincronización en tiempo real
-        startRealtimeSync()
+        // Configurar sincronización completa (tiempo real + WorkManager)
+        setupCompleteSync()
     }
 
     fun insertUsuario(nombre: String, edad: Int) = viewModelScope.launch {
@@ -37,18 +34,19 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
         repository.deleteUsuario(usuario)
     }
 
-    private fun syncFromFirebase() = viewModelScope.launch {
-        repository.syncFromFirebase()
+    // Configurar sincronización completa
+    private fun setupCompleteSync() {
+        repository.setupCompleteSync()
     }
 
-    // Iniciar sincronización en tiempo real
-    private fun startRealtimeSync() = viewModelScope.launch {
-        repository.startRealtimeSync()
-    }
-
-    // Método para sincronización manual (opcional)
+    // Método para sincronización manual
     fun manualSync() = viewModelScope.launch {
         repository.syncFromFirebase()
+    }
+
+    // Método para forzar sincronización inmediata con WorkManager
+    fun forceSync() {
+        repository.forceSync()
     }
 
     // Limpiar recursos cuando el ViewModel se destruya
