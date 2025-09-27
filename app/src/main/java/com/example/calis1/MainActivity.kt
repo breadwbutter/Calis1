@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -125,9 +125,12 @@ fun UsuarioApp(
 ) {
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
-    var isManualSync by remember { mutableStateOf(false) }
-    val usuarios: List<Usuario> by viewModel.allUsuarios.observeAsState(emptyList())
-    val coroutineScope = rememberCoroutineScope()
+
+    // StateFlow - Estados reactivos
+    val usuarios by viewModel.allUsuarios.collectAsState()
+    val usuariosCount by viewModel.usuariosCount.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+
     val context = LocalContext.current
 
     // Observar estado de WorkManager
@@ -146,6 +149,14 @@ fun UsuarioApp(
         }
     }
 
+    // Auto-limpiar mensajes después de 3 segundos
+    LaunchedEffect(uiState.lastAction, uiState.error) {
+        if (uiState.lastAction != null || uiState.error != null) {
+            kotlinx.coroutines.delay(3000)
+            viewModel.clearMessages()
+        }
+    }
+
     // Determinar título y usuario actual
     val (titlePrefix, currentUser) = when (authState) {
         is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
@@ -158,9 +169,9 @@ fun UsuarioApp(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Usuarios - Room + Firebase")
+                        Text("Usuarios - StateFlow + Firebase")
                         Text(
-                            text = titlePrefix,
+                            text = "$titlePrefix • $usuariosCount usuarios",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
@@ -186,15 +197,11 @@ fun UsuarioApp(
                     // Botón de sincronización manual tradicional
                     IconButton(
                         onClick = {
-                            isManualSync = true
-                            coroutineScope.launch {
-                                viewModel.manualSync()
-                                isManualSync = false
-                            }
+                            viewModel.manualSync()
                         },
-                        enabled = !isManualSync
+                        enabled = !uiState.isLoading
                     ) {
-                        if (isManualSync) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(20.dp),
                                 strokeWidth = 2.dp
@@ -216,6 +223,31 @@ fun UsuarioApp(
                     }
                 }
             )
+        },
+        snackbarHost = {
+            // Snackbar para mensajes de estado
+            if (uiState.error != null || uiState.lastAction != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (uiState.error != null)
+                            MaterialTheme.colorScheme.errorContainer
+                        else
+                            MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Text(
+                        text = uiState.error ?: uiState.lastAction ?: "",
+                        modifier = Modifier.padding(16.dp),
+                        color = if (uiState.error != null)
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
         }
     ) { paddingValues ->
         Column(
@@ -242,17 +274,25 @@ fun UsuarioApp(
 
                     OutlinedTextField(
                         value = nombre,
-                        onValueChange = { nombre = it },
+                        onValueChange = {
+                            nombre = it
+                            viewModel.clearMessages()
+                        },
                         label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = uiState.error?.contains("nombre", ignoreCase = true) == true
                     )
 
                     OutlinedTextField(
                         value = edad,
-                        onValueChange = { edad = it },
+                        onValueChange = {
+                            edad = it
+                            viewModel.clearMessages()
+                        },
                         label = { Text("Edad") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = uiState.error?.contains("edad", ignoreCase = true) == true
                     )
 
                     Button(
@@ -261,51 +301,121 @@ fun UsuarioApp(
                                 viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
                                 nombre = ""
                                 edad = ""
+                            } else {
+                                viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !uiState.isLoading
                     ) {
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
                         Text("Guardar Usuario")
                     }
                 }
             }
 
-            // Lista de usuarios
+            // Lista de usuarios con indicador de estado
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Usuarios Guardados (${usuarios.size})",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = "Usuarios (${usuarios.size})",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (uiState.isLoading) {
+                        Text(
+                            text = "Cargando...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 // Indicador discreto de WorkManager
-                Text(
-                    text = workStatus,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = when (workStatus) {
-                        "Sincronizando..." -> MaterialTheme.colorScheme.primary
-                        "Completado" -> MaterialTheme.colorScheme.tertiary
-                        "Programado" -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (workStatus == "Sincronizando...") {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 1.dp
+                        )
                     }
-                )
+                    Text(
+                        text = workStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when (workStatus) {
+                            "Sincronizando..." -> MaterialTheme.colorScheme.primary
+                            "Completado" -> MaterialTheme.colorScheme.tertiary
+                            "Programado" -> MaterialTheme.colorScheme.secondary
+                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        }
+                    )
+                }
             }
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = usuarios,
-                    key = { usuario -> usuario.id }
-                ) { usuario ->
-                    UsuarioItem(
-                        usuario = usuario,
-                        onDelete = { viewModel.deleteUsuario(usuario) }
+            // Lista de usuarios o mensaje vacío
+            if (uiState.hasUsers) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        items = usuarios,
+                        key = { usuario -> usuario.id }
+                    ) { usuario ->
+                        UsuarioItem(
+                            usuario = usuario,
+                            onDelete = { viewModel.deleteUsuario(usuario) },
+                            isLoading = uiState.isLoading
+                        )
+                    }
+                }
+            } else {
+                // Estado vacío
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "📝",
+                                style = MaterialTheme.typography.headlineLarge
+                            )
+                            Text(
+                                text = "No hay usuarios",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Agrega el primer usuario",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -315,7 +425,8 @@ fun UsuarioApp(
 @Composable
 fun UsuarioItem(
     usuario: Usuario,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    isLoading: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -348,12 +459,22 @@ fun UsuarioItem(
                 )
             }
 
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Eliminar usuario",
-                    tint = MaterialTheme.colorScheme.error
-                )
+            IconButton(
+                onClick = onDelete,
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Eliminar usuario",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
             }
         }
     }

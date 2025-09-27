@@ -1,7 +1,6 @@
 package com.example.calis1.repository
 
 import android.content.Context
-import androidx.lifecycle.LiveData
 import com.example.calis1.data.dao.UsuarioDao
 import com.example.calis1.data.entity.Usuario
 import com.example.calis1.worker.SyncWorker
@@ -9,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -20,8 +20,11 @@ class UsuarioRepository(
     private val usuariosCollection = firestore.collection("usuarios")
     private var listenerRegistration: ListenerRegistration? = null
 
-    // Obtener todos los usuarios de Room
-    fun getAllUsuarios(): LiveData<List<Usuario>> = usuarioDao.getAllUsuarios()
+    // Flow reactivo para usuarios
+    fun getAllUsuarios(): Flow<List<Usuario>> = usuarioDao.getAllUsuarios()
+
+    // Flow para contar usuarios
+    fun getUsuariosCount(): Flow<Int> = usuarioDao.getUsuariosCount()
 
     // Insertar usuario en Room y Firebase
     suspend fun insertUsuario(usuario: Usuario) {
