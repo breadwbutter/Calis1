@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -23,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.credentials.CredentialManager
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -32,7 +32,7 @@ import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
 import com.example.calis1.viewmodel.UsuarioViewModel
-import kotlinx.coroutines.launch
+import com.example.calis1.viewmodel.AlcoholTrackingViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,9 +79,9 @@ fun MainApp() {
         is AuthState.SignedIn,
         is AuthState.TraditionalSignedIn,
         is AuthState.EmailSignedIn -> {
-            println("🔍 DEBUG: MainActivity - Mostrando UsuarioApp")
-            // Usuario logueado - mostrar pantalla principal
-            UsuarioApp(
+            println("🔍 DEBUG: MainActivity - Mostrando MainScreen con opciones")
+            // Usuario logueado - mostrar pantalla principal con selección
+            MainAppScreen(
                 authState = authState,
                 onLogout = {
                     authViewModel.signOut(context)
@@ -129,10 +129,114 @@ fun LoadingScreen() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun MainAppScreen(
+    authState: AuthState,
+    onLogout: () -> Unit
+) {
+    // Estado para controlar qué pantalla mostrar
+    var currentScreen by remember { mutableStateOf("alcohol") } // "alcohol" o "usuarios"
+
+    // Determinar título y usuario actual basado en el tipo de autenticación
+    val (titlePrefix, currentUser) = when (authState) {
+        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
+        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin@gmail.com"
+        is AuthState.EmailSignedIn -> "Email: ${authState.username}" to authState.email
+        else -> "Usuario" to "Desconocido"
+    }
+
+    // Scaffold principal con TopBar que permite cambiar entre pantallas
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("BeerBattle - ${if (currentScreen == "alcohol") "Control Semanal" else "Gestión Usuarios"}")
+                        Text(
+                            text = titlePrefix,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                },
+                actions = {
+                    // Botón para cambiar entre pantallas
+                    IconButton(
+                        onClick = {
+                            currentScreen = if (currentScreen == "alcohol") "usuarios" else "alcohol"
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SwapHoriz,
+                            contentDescription = "Cambiar pantalla",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Botón de logout
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = "Cerrar sesión"
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        // Mostrar la pantalla correspondiente
+        when (currentScreen) {
+            "alcohol" -> {
+                // Nueva pantalla de control de alcohol
+                AlcoholTrackingScreenWrapper(
+                    authState = authState,
+                    paddingValues = paddingValues
+                )
+            }
+            "usuarios" -> {
+                // Pantalla original de gestión de usuarios (mantenida)
+                UsuarioApp(
+                    authState = authState,
+                    onLogout = onLogout,
+                    paddingValues = paddingValues
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AlcoholTrackingScreenWrapper(
+    authState: AuthState,
+    paddingValues: PaddingValues
+) {
+    // ViewModel específico para seguimiento de alcohol
+    val alcoholViewModel: AlcoholTrackingViewModel = viewModel()
+
+    // Wrapper para la pantalla de alcohol con padding
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        AlcoholTrackingScreen(
+            viewModel = alcoholViewModel,
+            authState = authState,
+            onLogout = { /* Ya manejado en el nivel superior */ },
+            onHistorialClick = {
+                // TODO: Implementar navegación al historial
+                println("🔍 DEBUG: Click en Historial Semanal - Por implementar")
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun UsuarioApp(
     viewModel: UsuarioViewModel = viewModel(),
     authState: AuthState,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    paddingValues: PaddingValues
 ) {
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
@@ -168,265 +272,220 @@ fun UsuarioApp(
         }
     }
 
-    // Determinar título y usuario actual basado en el tipo de autenticación
-    val (titlePrefix, currentUser) = when (authState) {
-        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
-        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin@gmail.com"
-        is AuthState.EmailSignedIn -> "Email: ${authState.username}" to authState.email
-        else -> "Usuario" to "Desconocido"
-    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Snackbar para mensajes de estado
+        if (uiState.error != null || uiState.lastAction != null) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (uiState.error != null)
+                        MaterialTheme.colorScheme.errorContainer
+                    else
+                        MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Text(
+                    text = uiState.error ?: uiState.lastAction ?: "",
+                    modifier = Modifier.padding(16.dp),
+                    color = if (uiState.error != null)
+                        MaterialTheme.colorScheme.onErrorContainer
+                    else
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("BeerBattle - Usuarios") // NUEVO: Cambié el título
-                        Text(
-                            text = "$titlePrefix • $usuariosCount usuarios",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
-                },
-                actions = {
-                    // Botón de sincronización con WorkManager
-                    IconButton(
-                        onClick = {
-                            viewModel.forceSync()
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudSync,
-                            contentDescription = "Sincronizar con WorkManager",
-                            tint = if (workStatus == "Sincronizando...")
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+        // Formulario de entrada
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Agregar Usuario",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
 
-                    // Botón de sincronización manual tradicional
-                    IconButton(
-                        onClick = {
-                            viewModel.manualSync()
-                        },
-                        enabled = !uiState.isLoading
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp
-                            )
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = {
+                        nombre = it
+                        viewModel.clearMessages()
+                    },
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.error?.contains("nombre", ignoreCase = true) == true
+                )
+
+                OutlinedTextField(
+                    value = edad,
+                    onValueChange = {
+                        edad = it
+                        viewModel.clearMessages()
+                    },
+                    label = { Text("Edad") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = uiState.error?.contains("edad", ignoreCase = true) == true
+                )
+
+                Button(
+                    onClick = {
+                        if (nombre.isNotBlank() && edad.isNotBlank()) {
+                            viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
+                            nombre = ""
+                            edad = ""
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Sincronización manual"
-                            )
+                            viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
                         }
-                    }
-
-                    // Botón de logout
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Cerrar sesión"
-                        )
-                    }
-                }
-            )
-        },
-        snackbarHost = {
-            // Snackbar para mensajes de estado
-            if (uiState.error != null || uiState.lastAction != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (uiState.error != null)
-                            MaterialTheme.colorScheme.errorContainer
-                        else
-                            MaterialTheme.colorScheme.primaryContainer
-                    )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !uiState.isLoading
                 ) {
-                    Text(
-                        text = uiState.error ?: uiState.lastAction ?: "",
-                        modifier = Modifier.padding(16.dp),
-                        color = if (uiState.error != null)
-                            MaterialTheme.colorScheme.onErrorContainer
-                        else
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text("Guardar Usuario")
                 }
             }
         }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+
+        // Lista de usuarios con indicador de estado
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Formulario de entrada
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
+            Column {
+                Text(
+                    text = "Usuarios (${usuarios.size})",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                if (uiState.isLoading) {
                     Text(
-                        text = "Agregar Usuario",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = {
-                            nombre = it
-                            viewModel.clearMessages()
-                        },
-                        label = { Text("Nombre") },
-                        modifier = Modifier.fillMaxWidth(),
-                        isError = uiState.error?.contains("nombre", ignoreCase = true) == true
-                    )
-
-                    OutlinedTextField(
-                        value = edad,
-                        onValueChange = {
-                            edad = it
-                            viewModel.clearMessages()
-                        },
-                        label = { Text("Edad") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        isError = uiState.error?.contains("edad", ignoreCase = true) == true
-                    )
-
-                    Button(
-                        onClick = {
-                            if (nombre.isNotBlank() && edad.isNotBlank()) {
-                                viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
-                                nombre = ""
-                                edad = ""
-                            } else {
-                                viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !uiState.isLoading
-                    ) {
-                        if (uiState.isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                        }
-                        Text("Guardar Usuario")
-                    }
-                }
-            }
-
-            // Lista de usuarios con indicador de estado
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Usuarios (${usuarios.size})",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (uiState.isLoading) {
-                        Text(
-                            text = "Cargando...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                // Indicador discreto de WorkManager
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (workStatus == "Sincronizando...") {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(12.dp),
-                            strokeWidth = 1.dp
-                        )
-                    }
-                    Text(
-                        text = workStatus,
+                        text = "Cargando...",
                         style = MaterialTheme.typography.bodySmall,
-                        color = when (workStatus) {
-                            "Sincronizando..." -> MaterialTheme.colorScheme.primary
-                            "Completado" -> MaterialTheme.colorScheme.tertiary
-                            "Programado" -> MaterialTheme.colorScheme.secondary
-                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        }
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
 
-            // Lista de usuarios o mensaje vacío
-            if (uiState.hasUsers) {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            // Indicador discreto de WorkManager
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        viewModel.forceSync()
+                    }
                 ) {
-                    items(
-                        items = usuarios,
-                        key = { usuario -> usuario.id }
-                    ) { usuario ->
-                        UsuarioItem(
-                            usuario = usuario,
-                            onDelete = { viewModel.deleteUsuario(usuario) },
-                            isLoading = uiState.isLoading
+                    Icon(
+                        imageVector = Icons.Default.CloudSync,
+                        contentDescription = "Sincronizar con WorkManager",
+                        tint = if (workStatus == "Sincronizando...")
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        viewModel.manualSync()
+                    },
+                    enabled = !uiState.isLoading
+                ) {
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Sincronización manual"
                         )
                     }
                 }
-            } else {
-                // Estado vacío
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+
+                Text(
+                    text = workStatus,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = when (workStatus) {
+                        "Sincronizando..." -> MaterialTheme.colorScheme.primary
+                        "Completado" -> MaterialTheme.colorScheme.tertiary
+                        "Programado" -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    }
+                )
+            }
+        }
+
+        // Lista de usuarios o mensaje vacío
+        if (uiState.hasUsers) {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(
+                    items = usuarios,
+                    key = { usuario -> usuario.id }
+                ) { usuario ->
+                    UsuarioItem(
+                        usuario = usuario,
+                        onDelete = { viewModel.deleteUsuario(usuario) },
+                        isLoading = uiState.isLoading
                     )
+                }
+            }
+        } else {
+            // Estado vacío
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "🍺",
-                                style = MaterialTheme.typography.headlineLarge
-                            )
-                            Text(
-                                text = "No hay usuarios",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = "Agrega el primer soldado",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
-                        }
+                        Text(
+                            text = "👥",
+                            style = MaterialTheme.typography.headlineLarge
+                        )
+                        Text(
+                            text = "No hay usuarios",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Agrega el primer usuario",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
                     }
                 }
             }

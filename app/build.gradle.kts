@@ -32,6 +32,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // NUEVO: Habilitar soporte para Java 8+ APIs (LocalDate, LocalDateTime, etc.)
+        isCoreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = "11"
@@ -42,7 +44,10 @@ android {
 }
 
 dependencies {
-    // Compose BOM y UI
+    // NUEVO: Core library desugaring para soporte de Java 8+ APIs en versiones anteriores
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // Compose BOM y UI (EXISTENTES - mantenidos)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -52,27 +57,27 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
 
-    // Iconos extendidos para Visibility y VisibilityOff
+    // Iconos extendidos para Visibility y VisibilityOff (EXISTENTE - mantenido)
     implementation("androidx.compose.material:material-icons-extended:1.7.4")
 
-    // Room - versiones compatibles
+    // Room - versiones compatibles (EXISTENTE - mantenido)
     implementation("androidx.room:room-runtime:2.5.2")
     implementation("androidx.room:room-ktx:2.5.2")
     ksp("androidx.room:room-compiler:2.5.2")
 
-    // Firebase
+    // Firebase (EXISTENTE - mantenido)
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-auth")
 
-    // ViewModel y LiveData
+    // ViewModel y LiveData (EXISTENTE - mantenido)
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.compose.runtime:runtime-livedata:1.7.4")
 
-    // WorkManager - NUEVA DEPENDENCIA
+    // WorkManager - EXISTENTE (ya estaba en el proyecto original)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
-    // Testing
+    // Testing (EXISTENTES - mantenidos)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -81,20 +86,21 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Firebase BoM ensures compatible versions
+    // Firebase BoM ensures compatible versions (EXISTENTE - mantenido)
     implementation(platform("com.google.firebase:firebase-bom:34.3.0"))
     implementation("com.google.firebase:firebase-auth")
 
-    // Credential Manager for modern authentication flow
+    // Credential Manager for modern authentication flow (EXISTENTES - mantenidos)
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
 
-    // Google Identity Services library
+    // Google Identity Services library (EXISTENTE - mantenido)
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
-    // Coroutines for async operations
+    // Coroutines for async operations (EXISTENTE - mantenido)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 
+    // EXISTENTES duplicados - mantenidos por compatibilidad
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")

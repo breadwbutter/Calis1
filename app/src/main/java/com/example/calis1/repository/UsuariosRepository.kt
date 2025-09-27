@@ -3,7 +3,7 @@ package com.example.calis1.repository
 import android.content.Context
 import com.example.calis1.data.dao.UsuarioDao
 import com.example.calis1.data.entity.Usuario
-import com.example.calis1.worker.SyncWorker
+import com.example.calis1.worker.UsuarioSyncWorker
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
@@ -36,12 +36,12 @@ class UsuarioRepository(
             usuariosCollection.document(usuario.id).set(usuario.toMap()).await()
 
             // Programar sincronización para asegurar consistencia
-            SyncWorker.syncNow(context)
+            UsuarioSyncWorker.syncNow(context)
 
         } catch (e: Exception) {
             // Si Firebase falla, programar sincronización posterior
             e.printStackTrace()
-            SyncWorker.syncNow(context)
+            UsuarioSyncWorker.syncNow(context)
         }
     }
 
@@ -55,12 +55,12 @@ class UsuarioRepository(
             usuariosCollection.document(usuario.id).delete().await()
 
             // Programar sincronización para asegurar consistencia
-            SyncWorker.syncNow(context)
+            UsuarioSyncWorker.syncNow(context)
 
         } catch (e: Exception) {
             // Si Firebase falla, programar sincronización posterior
             e.printStackTrace()
-            SyncWorker.syncNow(context)
+            UsuarioSyncWorker.syncNow(context)
         }
     }
 
@@ -97,7 +97,7 @@ class UsuarioRepository(
         } catch (e: Exception) {
             e.printStackTrace()
             // Si falla, programar sincronización con WorkManager
-            SyncWorker.syncNow(context)
+            UsuarioSyncWorker.syncNow(context)
         }
     }
 
@@ -107,7 +107,7 @@ class UsuarioRepository(
             if (error != null) {
                 error.printStackTrace()
                 // Si hay error, programar sincronización con WorkManager
-                SyncWorker.syncNow(context)
+                UsuarioSyncWorker.syncNow(context)
                 return@addSnapshotListener
             }
 
@@ -119,7 +119,7 @@ class UsuarioRepository(
                     } catch (e: Exception) {
                         e.printStackTrace()
                         // Si falla, usar WorkManager como backup
-                        SyncWorker.syncNow(context)
+                        UsuarioSyncWorker.syncNow(context)
                     }
                 }
             }
@@ -164,10 +164,10 @@ class UsuarioRepository(
     // Configurar sincronización completa (tiempo real + WorkManager)
     fun setupCompleteSync() {
         // 1. Configurar sincronización periódica en segundo plano
-        SyncWorker.setupPeriodicSync(context)
+        UsuarioSyncWorker.setupPeriodicSync(context)
 
         // 2. Iniciar sincronización inmediata
-        SyncWorker.syncNow(context)
+        UsuarioSyncWorker.syncNow(context)
 
         // 3. Configurar listener en tiempo real para cuando la app esté activa
         CoroutineScope(Dispatchers.IO).launch {
@@ -184,11 +184,11 @@ class UsuarioRepository(
     // Limpiar todos los recursos y detener toda sincronización
     fun cleanup() {
         stopRealtimeSync()
-        SyncWorker.stopAllSync(context)
+        UsuarioSyncWorker.stopAllSync(context)
     }
 
     // Forzar sincronización manual inmediata
     fun forceSync() {
-        SyncWorker.syncNow(context)
+        UsuarioSyncWorker.syncNow(context)
     }
 }
