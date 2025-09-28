@@ -7,6 +7,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface AlcoholRecordDao {
 
+    // OBTENER TODOS LOS REGISTROS DE UN USUARIO PARA EL HISTORIAL
+    @Query("SELECT * FROM alcohol_records WHERE userId = :userId ORDER BY timestamp DESC")
+    fun getAllAlcoholRecords(userId: String): Flow<List<AlcoholRecord>>
+
     // Obtener todos los registros de una semana específica para un usuario
     @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC, timestamp ASC")
     fun getRegistrosSemana(userId: String, semanaInicio: String): Flow<List<AlcoholRecord>>

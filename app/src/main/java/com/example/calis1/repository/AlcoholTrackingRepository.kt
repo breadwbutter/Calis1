@@ -28,6 +28,13 @@ class AlcoholTrackingRepository(
     }
 
     /**
+     * NUEVO: Flow reactivo para TODOS los registros de un usuario (para el historial)
+     */
+    fun getAllAlcoholRecords(userId: String): Flow<List<AlcoholRecord>> {
+        return alcoholRecordDao.getAllAlcoholRecords(userId)
+    }
+
+    /**
      * Obtener registro específico por ID
      */
     suspend fun getRegistroById(registroId: String): AlcoholRecord? {

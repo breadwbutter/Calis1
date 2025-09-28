@@ -134,12 +134,12 @@ fun MainAppScreen(
     onLogout: () -> Unit
 ) {
     // Estado para controlar qué pantalla mostrar
-    var currentScreen by remember { mutableStateOf("alcohol") } // "alcohol" o "usuarios"
+    var currentScreen by remember { mutableStateOf("alcohol") } // "alcohol", "history" o "usuarios"
 
     // Determinar título y usuario actual basado en el tipo de autenticación
     val (titlePrefix, currentUser) = when (authState) {
-        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.email
-        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin@gmail.com"
+        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.uid
+        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin"
         is AuthState.EmailSignedIn -> "Email: ${authState.username}" to authState.email
         else -> "Usuario" to "Desconocido"
     }
@@ -149,13 +149,19 @@ fun MainAppScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (currentScreen == "alcohol") "Control Semanal" else "BeerBattle - Gestión Usuarios")
+                    Text(
+                        when (currentScreen) {
+                            "alcohol" -> "Control Semanal"
+                            "history" -> "Historial Semanal"
+                            else -> "BeerBattle - Gestión Usuarios"
+                        }
+                    )
                 },
                 actions = {
                     // Botón para cambiar entre pantallas
                     IconButton(
                         onClick = {
-                            currentScreen = if (currentScreen == "alcohol") "usuarios" else "alcohol"
+                            currentScreen = if (currentScreen == "alcohol" || currentScreen == "history") "usuarios" else "alcohol"
                         }
                     ) {
                         Icon(
@@ -179,11 +185,17 @@ fun MainAppScreen(
         // Mostrar la pantalla correspondiente
         when (currentScreen) {
             "alcohol" -> {
-                // Nueva pantalla de control de alcohol
                 AlcoholTrackingScreenWrapper(
                     authState = authState,
-                    paddingValues = paddingValues
+                    paddingValues = paddingValues,
+                    onNavigateToHistory = {
+                        currentScreen = "history"
+                    }
                 )
+            }
+            "history" -> {
+                // Muestra la nueva pantalla de historial
+                HistoryScreen(userId = currentUser)
             }
             "usuarios" -> {
                 // Pantalla original de gestión de usuarios (mantenida)
@@ -200,7 +212,8 @@ fun MainAppScreen(
 @Composable
 fun AlcoholTrackingScreenWrapper(
     authState: AuthState,
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    onNavigateToHistory: () -> Unit
 ) {
     // ViewModel específico para seguimiento de alcohol
     val alcoholViewModel: AlcoholTrackingViewModel = viewModel()
@@ -215,10 +228,7 @@ fun AlcoholTrackingScreenWrapper(
             viewModel = alcoholViewModel,
             authState = authState,
             onLogout = { /* Ya manejado en el nivel superior */ },
-            onHistorialClick = {
-                // TODO: Implementar navegación al historial
-                println("🔍 DEBUG: Click en Historial Semanal - Por implementar")
-            }
+            onHistorialClick = onNavigateToHistory
         )
     }
 }
