@@ -20,6 +20,16 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
     private val _currentUserId = MutableStateFlow("")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 
+    // NUEVO: Estado para búsqueda
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _searchResults = MutableStateFlow<List<Evento>>(emptyList())
+    val searchResults: StateFlow<List<Evento>> = _searchResults.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
     // Flow de eventos directo desde repository
     val allEventos: StateFlow<List<Evento>>
 
@@ -84,6 +94,119 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
         if (userId.isNotEmpty()) {
             repository.setupCompleteSync(userId)
         }
+    }
+
+    /**
+     * NUEVO: Actualizar query de búsqueda
+     */
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * NUEVO: Ejecutar búsqueda de eventos
+     */
+    fun buscarEventos(query: String = _searchQuery.value) {
+        if (query.isBlank()) {
+            _searchResults.value = emptyList()
+            _isSearching.value = false
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _isSearching.value = true
+                _uiState.value = _uiState.value.copy(error = null)
+
+                val userId = _currentUserId.value
+                if (userId.isNotEmpty()) {
+                    val resultados = repository.buscarEventos(userId, query)
+                    _searchResults.value = resultados
+
+                    _uiState.value = _uiState.value.copy(
+                        lastAction = if (resultados.isNotEmpty()) {
+                            "Se encontraron ${resultados.size} evento${if (resultados.size != 1) "s" else ""}"
+                        } else {
+                            "No se encontraron eventos que coincidan con '$query'"
+                        }
+                    )
+                } else {
+                    updateError("Usuario no válido")
+                }
+
+            } catch (e: Exception) {
+                updateError("Error en la búsqueda: ${e.message}")
+                _searchResults.value = emptyList()
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+
+    /**
+     * NUEVO: Búsqueda avanzada con opciones específicas
+     */
+    fun buscarEventosAvanzado(
+        query: String,
+        buscarTitulo: Boolean = true,
+        buscarDescripcion: Boolean = true,
+        buscarFecha: Boolean = true
+    ) {
+        if (query.isBlank()) {
+            _searchResults.value = emptyList()
+            _isSearching.value = false
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _isSearching.value = true
+                _uiState.value = _uiState.value.copy(error = null)
+
+                val userId = _currentUserId.value
+                if (userId.isNotEmpty()) {
+                    val resultados = repository.buscarEventosAvanzado(
+                        userId = userId,
+                        query = query,
+                        buscarTitulo = buscarTitulo,
+                        buscarDescripcion = buscarDescripcion,
+                        buscarFecha = buscarFecha
+                    )
+                    _searchResults.value = resultados
+
+                    val camposBuscados = mutableListOf<String>()
+                    if (buscarTitulo) camposBuscados.add("título")
+                    if (buscarDescripcion) camposBuscados.add("descripción")
+                    if (buscarFecha) camposBuscados.add("fecha")
+
+                    _uiState.value = _uiState.value.copy(
+                        lastAction = if (resultados.isNotEmpty()) {
+                            "Se encontraron ${resultados.size} evento${if (resultados.size != 1) "s" else ""} en: ${camposBuscados.joinToString(", ")}"
+                        } else {
+                            "No se encontraron eventos en ${camposBuscados.joinToString(", ")} que coincidan con '$query'"
+                        }
+                    )
+                } else {
+                    updateError("Usuario no válido")
+                }
+
+            } catch (e: Exception) {
+                updateError("Error en la búsqueda avanzada: ${e.message}")
+                _searchResults.value = emptyList()
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+
+    /**
+     * NUEVO: Limpiar resultados de búsqueda
+     */
+    fun limpiarBusqueda() {
+        _searchQuery.value = ""
+        _searchResults.value = emptyList()
+        _isSearching.value = false
+        _uiState.value = _uiState.value.copy(lastAction = null)
     }
 
     /**

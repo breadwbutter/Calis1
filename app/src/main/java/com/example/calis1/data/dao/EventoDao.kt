@@ -43,11 +43,52 @@ interface EventoDao {
     @Query("SELECT COUNT(*) FROM eventos WHERE userId = :userId")
     fun getEventosCount(userId: String): Flow<Int>
 
-    // Buscar eventos por título o descripción
-    @Query("SELECT * FROM eventos WHERE userId = :userId AND (titulo LIKE '%' || :query || '%' OR descripcion LIKE '%' || :query || '%') ORDER BY timestamp DESC")
+    // MEJORADO: Buscar eventos por título, descripción O fecha (búsqueda completa)
+    @Query("""
+        SELECT * FROM eventos 
+        WHERE userId = :userId 
+        AND (
+            titulo LIKE '%' || :query || '%' 
+            OR descripcion LIKE '%' || :query || '%' 
+            OR fecha LIKE '%' || :query || '%'
+        ) 
+        ORDER BY timestamp DESC
+    """)
     suspend fun buscarEventos(userId: String, query: String): List<Evento>
 
-    // Obtener eventos por fecha
+    // NUEVO: Búsqueda con Flow reactivo para la pantalla de búsqueda
+    @Query("""
+        SELECT * FROM eventos 
+        WHERE userId = :userId 
+        AND (
+            titulo LIKE '%' || :query || '%' 
+            OR descripcion LIKE '%' || :query || '%' 
+            OR fecha LIKE '%' || :query || '%'
+        ) 
+        ORDER BY timestamp DESC
+    """)
+    fun buscarEventosFlow(userId: String, query: String): Flow<List<Evento>>
+
+    // Obtener eventos por fecha exacta
     @Query("SELECT * FROM eventos WHERE userId = :userId AND fecha = :fecha ORDER BY timestamp DESC")
     suspend fun getEventosPorFecha(userId: String, fecha: String): List<Evento>
+
+    // NUEVO: Búsqueda avanzada por campos específicos
+    @Query("""
+        SELECT * FROM eventos 
+        WHERE userId = :userId 
+        AND (
+            (:buscarTitulo = 1 AND titulo LIKE '%' || :query || '%') 
+            OR (:buscarDescripcion = 1 AND descripcion LIKE '%' || :query || '%') 
+            OR (:buscarFecha = 1 AND fecha LIKE '%' || :query || '%')
+        ) 
+        ORDER BY timestamp DESC
+    """)
+    suspend fun buscarEventosAvanzado(
+        userId: String,
+        query: String,
+        buscarTitulo: Boolean = true,
+        buscarDescripcion: Boolean = true,
+        buscarFecha: Boolean = true
+    ): List<Evento>
 }

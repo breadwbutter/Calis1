@@ -35,6 +35,47 @@ class EventosRepository(
     }
 
     /**
+     * NUEVO: Buscar eventos por query (título, descripción o fecha)
+     */
+    suspend fun buscarEventos(userId: String, query: String): List<Evento> {
+        return if (query.isBlank()) {
+            emptyList()
+        } else {
+            eventoDao.buscarEventos(userId, query.trim())
+        }
+    }
+
+    /**
+     * NUEVO: Buscar eventos con Flow reactivo (para búsqueda en tiempo real)
+     */
+    fun buscarEventosFlow(userId: String, query: String): Flow<List<Evento>> {
+        return eventoDao.buscarEventosFlow(userId, query.trim())
+    }
+
+    /**
+     * NUEVO: Búsqueda avanzada con opciones específicas
+     */
+    suspend fun buscarEventosAvanzado(
+        userId: String,
+        query: String,
+        buscarTitulo: Boolean = true,
+        buscarDescripcion: Boolean = true,
+        buscarFecha: Boolean = true
+    ): List<Evento> {
+        return if (query.isBlank()) {
+            emptyList()
+        } else {
+            eventoDao.buscarEventosAvanzado(
+                userId = userId,
+                query = query.trim(),
+                buscarTitulo = buscarTitulo,
+                buscarDescripcion = buscarDescripcion,
+                buscarFecha = buscarFecha
+            )
+        }
+    }
+
+    /**
      * Obtener evento por ID
      */
     suspend fun getEventoById(eventoId: String): Evento? {

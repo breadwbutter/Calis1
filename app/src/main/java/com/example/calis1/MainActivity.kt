@@ -30,7 +30,7 @@ import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AlcoholTrackingViewModel
 import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
-import com.example.calis1.viewmodel.EventosViewModel // NUEVO: Importar EventosViewModel
+import com.example.calis1.viewmodel.EventosViewModel
 import com.example.calis1.viewmodel.NotasViewModel
 
 class MainActivity : ComponentActivity() {
@@ -112,8 +112,9 @@ fun MainAppWithNavigation(
                         text = when (currentRoute) {
                             NavigationRoutes.ALCOHOL_TRACKING -> "Control Semanal"
                             NavigationRoutes.NOTAS -> "Notas"
-                            NavigationRoutes.EVENTOS -> "Eventos" // NUEVO: Título para eventos
-                            NavigationRoutes.EVENTOS_LIST -> "Lista de Eventos" // NUEVO: Título para lista de eventos
+                            NavigationRoutes.EVENTOS -> "Eventos"
+                            NavigationRoutes.EVENTOS_LIST -> "Lista de Eventos"
+                            NavigationRoutes.BUSCADOR -> "Buscador de Eventos" // NUEVO: Título para buscador
                             NavigationRoutes.PROFILE -> "Mi Perfil"
                             NavigationRoutes.HISTORY -> "Historial Semanal"
                             else -> "BeerBattle"
@@ -123,7 +124,8 @@ fun MainAppWithNavigation(
                 actions = {
                     if (currentRoute != NavigationRoutes.PROFILE &&
                         currentRoute != NavigationRoutes.HISTORY &&
-                        currentRoute != NavigationRoutes.EVENTOS_LIST) { // NUEVO: Excluir lista de eventos
+                        currentRoute != NavigationRoutes.EVENTOS_LIST &&
+                        currentRoute != NavigationRoutes.BUSCADOR) { // NUEVO: Excluir buscador
 
                         // Botón de perfil
                         IconButton(
@@ -142,8 +144,8 @@ fun MainAppWithNavigation(
                             onClick = {
                                 val nextRoute = when (currentRoute) {
                                     NavigationRoutes.ALCOHOL_TRACKING -> NavigationRoutes.NOTAS
-                                    NavigationRoutes.NOTAS -> NavigationRoutes.EVENTOS // NUEVO: Incluir eventos en rotación
-                                    NavigationRoutes.EVENTOS -> NavigationRoutes.ALCOHOL_TRACKING // NUEVO: Volver al inicio
+                                    NavigationRoutes.NOTAS -> NavigationRoutes.EVENTOS
+                                    NavigationRoutes.EVENTOS -> NavigationRoutes.ALCOHOL_TRACKING
                                     else -> NavigationRoutes.ALCOHOL_TRACKING
                                 }
                                 navController.navigate(nextRoute) {
@@ -158,9 +160,10 @@ fun MainAppWithNavigation(
                         }
                     }
                 },
-                // NUEVO: Botón de navegación hacia atrás para lista de eventos
+                // Botón de navegación hacia atrás para pantallas secundarias
                 navigationIcon = {
-                    if (currentRoute == NavigationRoutes.EVENTOS_LIST) {
+                    if (currentRoute == NavigationRoutes.EVENTOS_LIST ||
+                        currentRoute == NavigationRoutes.BUSCADOR) { // NUEVO: Incluir buscador
                         IconButton(
                             onClick = {
                                 navController.popBackStack()
@@ -178,7 +181,8 @@ fun MainAppWithNavigation(
         bottomBar = {
             if (currentRoute != NavigationRoutes.PROFILE &&
                 currentRoute != NavigationRoutes.HISTORY &&
-                currentRoute != NavigationRoutes.EVENTOS_LIST) { // NUEVO: Excluir lista de eventos
+                currentRoute != NavigationRoutes.EVENTOS_LIST &&
+                currentRoute != NavigationRoutes.BUSCADOR) { // NUEVO: Excluir buscador
                 NavigationBottomBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
@@ -207,7 +211,6 @@ fun MainAppWithNavigation(
                 NotasAppWrapper(paddingValues = PaddingValues(0.dp))
             }
 
-            // NUEVO: Pantalla de eventos
             composable(NavigationRoutes.EVENTOS) {
                 EventosScreenWrapper(
                     authState = authState,
@@ -216,9 +219,16 @@ fun MainAppWithNavigation(
                 )
             }
 
-            // NUEVO: Lista de eventos
             composable(NavigationRoutes.EVENTOS_LIST) {
                 EventosListScreenWrapper(
+                    authState = authState,
+                    paddingValues = PaddingValues(0.dp)
+                )
+            }
+
+            // NUEVO: Composable para la pantalla de buscador
+            composable(NavigationRoutes.BUSCADOR) {
+                BuscadorScreenWrapper(
                     authState = authState,
                     paddingValues = PaddingValues(0.dp)
                 )
@@ -279,7 +289,6 @@ fun NavigationBottomBar(
             onClick = { onNavigate(NavigationRoutes.NOTAS) }
         )
 
-        // NUEVO: Botón de navegación para eventos
         NavigationBarItem(
             icon = {
                 Icon(
@@ -339,7 +348,6 @@ fun AlcoholTrackingScreenWrapper(
     }
 }
 
-// NUEVO: Wrapper para EventosScreen
 @Composable
 fun EventosScreenWrapper(
     authState: AuthState,
@@ -358,12 +366,15 @@ fun EventosScreenWrapper(
             authState = authState,
             onVerEventosClick = {
                 navController.navigate(NavigationRoutes.EVENTOS_LIST)
+            },
+            // NUEVO: Agregar callback para navegar al buscador
+            onBuscarEventosClick = {
+                navController.navigate(NavigationRoutes.BUSCADOR)
             }
         )
     }
 }
 
-// NUEVO: Wrapper para EventosListScreen
 @Composable
 fun EventosListScreenWrapper(
     authState: AuthState,
@@ -377,6 +388,26 @@ fun EventosListScreenWrapper(
             .padding(paddingValues)
     ) {
         EventosListScreen(
+            viewModel = eventosViewModel,
+            authState = authState
+        )
+    }
+}
+
+// NUEVO: Wrapper para BuscadorScreen
+@Composable
+fun BuscadorScreenWrapper(
+    authState: AuthState,
+    paddingValues: PaddingValues
+) {
+    val eventosViewModel: EventosViewModel = viewModel()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        BuscadorScreen(
             viewModel = eventosViewModel,
             authState = authState
         )

@@ -24,7 +24,8 @@ import com.example.calis1.viewmodel.EventosViewModel
 fun EventosScreen(
     viewModel: EventosViewModel = viewModel(),
     authState: AuthState,
-    onVerEventosClick: () -> Unit
+    onVerEventosClick: () -> Unit,
+    onBuscarEventosClick: () -> Unit // NUEVO: Callback para navegar al buscador
 ) {
     // States del ViewModel
     val uiState by viewModel.uiState.collectAsState()
@@ -91,14 +92,33 @@ fun EventosScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Título de la pantalla
-        Text(
-            text = "Gestión de Eventos",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+        // NUEVO: Header con título y botón de búsqueda
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Gestión de Eventos",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Botón de búsqueda
+            FloatingActionButton(
+                onClick = onBuscarEventosClick,
+                modifier = Modifier.size(48.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Buscar eventos",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
 
         // Mensaje de estado
         if (uiState.error != null || uiState.lastAction != null) {
@@ -285,7 +305,7 @@ fun EventosScreen(
             }
         }
 
-        // Card de información y botón para ver eventos
+        // Card de información y botones de acción
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -319,27 +339,54 @@ fun EventosScreen(
                     color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
                 )
 
-                Button(
-                    onClick = onVerEventosClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                // NUEVO: Fila de botones
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.List,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Ver Eventos",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    // Botón de búsqueda (versión alternativa)
+                    OutlinedButton(
+                        onClick = onBuscarEventosClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Buscar",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    // Botón para ver todos los eventos
+                    Button(
+                        onClick = onVerEventosClick,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.List,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Ver Todo",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -355,7 +402,8 @@ fun EventosScreenPreview() {
     Calis1Theme {
         EventosScreen(
             authState = AuthState.TraditionalSignedIn("admin"),
-            onVerEventosClick = {}
+            onVerEventosClick = {},
+            onBuscarEventosClick = {}
         )
     }
 }
