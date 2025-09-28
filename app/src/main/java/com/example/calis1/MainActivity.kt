@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -26,15 +24,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import com.example.calis1.data.entity.Usuario
+import com.example.calis1.data.entity.Nota
 import com.example.calis1.navigation.NavigationRoutes
 import com.example.calis1.ui.theme.Calis1Theme
+import com.example.calis1.viewmodel.AlcoholTrackingViewModel
 import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
-import com.example.calis1.viewmodel.UsuarioViewModel
-import com.example.calis1.viewmodel.AlcoholTrackingViewModel
+import com.example.calis1.viewmodel.NotasViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,9 +110,9 @@ fun MainAppWithNavigation(
                     Text(
                         text = when (currentRoute) {
                             NavigationRoutes.ALCOHOL_TRACKING -> "Control Semanal"
-                            NavigationRoutes.USUARIOS -> "Gestión Usuarios"
+                            NavigationRoutes.NOTAS -> "Notas" // Título actualizado
                             NavigationRoutes.PROFILE -> "Mi Perfil"
-                            NavigationRoutes.HISTORY -> "Historial Semanal" // Título para historial
+                            NavigationRoutes.HISTORY -> "Historial Semanal"
                             else -> "BeerBattle"
                         }
                     )
@@ -135,11 +131,11 @@ fun MainAppWithNavigation(
                             )
                         }
 
-                        // Botón para cambiar entre alcohol y usuarios
+                        // Botón para cambiar entre alcohol y notas
                         IconButton(
                             onClick = {
                                 val nextRoute = if (currentRoute == NavigationRoutes.ALCOHOL_TRACKING) {
-                                    NavigationRoutes.USUARIOS
+                                    NavigationRoutes.NOTAS
                                 } else {
                                     NavigationRoutes.ALCOHOL_TRACKING
                                 }
@@ -179,16 +175,12 @@ fun MainAppWithNavigation(
                 AlcoholTrackingScreenWrapper(
                     authState = authState,
                     paddingValues = PaddingValues(0.dp),
-                    navController = navController // Pasar NavController
+                    navController = navController
                 )
             }
 
-            composable(NavigationRoutes.USUARIOS) {
-                UsuarioAppWrapper(
-                    authState = authState,
-                    onLogout = onLogout,
-                    paddingValues = PaddingValues(0.dp)
-                )
+            composable(NavigationRoutes.NOTAS) { // Ruta actualizada
+                NotasAppWrapper(paddingValues = PaddingValues(0.dp)) // Llamar al nuevo wrapper
             }
 
             composable(NavigationRoutes.PROFILE) {
@@ -203,7 +195,6 @@ fun MainAppWithNavigation(
                 )
             }
 
-            // Nueva ruta para el historial
             composable(NavigationRoutes.HISTORY) {
                 val userId = when (authState) {
                     is AuthState.SignedIn -> authState.user.uid
@@ -238,13 +229,13 @@ fun NavigationBottomBar(
         NavigationBarItem(
             icon = {
                 Icon(
-                    imageVector = Icons.Default.People,
-                    contentDescription = "Usuarios"
+                    imageVector = Icons.Default.Notes, // Icono actualizado
+                    contentDescription = "Notas"
                 )
             },
-            label = { Text("Usuarios") },
-            selected = currentRoute == NavigationRoutes.USUARIOS,
-            onClick = { onNavigate(NavigationRoutes.USUARIOS) }
+            label = { Text("Notas") }, // Label actualizado
+            selected = currentRoute == NavigationRoutes.NOTAS, // Ruta actualizada
+            onClick = { onNavigate(NavigationRoutes.NOTAS) } // Ruta actualizada
         )
     }
 }
@@ -266,11 +257,6 @@ fun LoadingScreen() {
                 text = "Verificando sesión...",
                 style = MaterialTheme.typography.bodyLarge
             )
-            Text(
-                text = "Si se demora mucho, verifica tu conexión",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
         }
     }
 }
@@ -279,7 +265,7 @@ fun LoadingScreen() {
 fun AlcoholTrackingScreenWrapper(
     authState: AuthState,
     paddingValues: PaddingValues,
-    navController: NavHostController // Recibir NavController
+    navController: NavHostController
 ) {
     val alcoholViewModel: AlcoholTrackingViewModel = viewModel()
 
@@ -293,47 +279,21 @@ fun AlcoholTrackingScreenWrapper(
             authState = authState,
             onLogout = { /* Ya manejado en el nivel superior */ },
             onHistorialClick = {
-                // Implementar navegación
                 navController.navigate(NavigationRoutes.HISTORY)
             }
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsuarioAppWrapper(
-    authState: AuthState,
-    onLogout: () -> Unit,
-    paddingValues: PaddingValues
-) {
-    val viewModel: UsuarioViewModel = viewModel()
-    var nombre by remember { mutableStateOf("") }
-    var edad by remember { mutableStateOf("") }
+fun NotasAppWrapper(paddingValues: PaddingValues) {
+    val viewModel: NotasViewModel = viewModel()
+    val notas by viewModel.allNotas.collectAsState()
 
-    val usuarios by viewModel.allUsuarios.collectAsState()
-    val uiState by viewModel.uiState.collectAsState()
-
-    val context = LocalContext.current
-    var workStatus by remember { mutableStateOf("Inactivo") }
-
-    LaunchedEffect(Unit) {
-        WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData("periodic_sync").observeForever { workInfos ->
-            workStatus = when {
-                workInfos.any { it.state == WorkInfo.State.RUNNING } -> "Sincronizando..."
-                workInfos.any { it.state == WorkInfo.State.ENQUEUED } -> "Programado"
-                workInfos.any { it.state == WorkInfo.State.SUCCEEDED } -> "Completado"
-                else -> "Inactivo"
-            }
-        }
-    }
-
-    LaunchedEffect(uiState.lastAction, uiState.error) {
-        if (uiState.lastAction != null || uiState.error != null) {
-            kotlinx.coroutines.delay(3000)
-            viewModel.clearMessages()
-        }
-    }
+    // Estados para el formulario
+    var titulo by remember { mutableStateOf("") }
+    var contenido by remember { mutableStateOf("") }
+    var notaSeleccionadaId by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
@@ -342,27 +302,7 @@ fun UsuarioAppWrapper(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        if (uiState.error != null || uiState.lastAction != null) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (uiState.error != null)
-                        MaterialTheme.colorScheme.errorContainer
-                    else
-                        MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Text(
-                    text = uiState.error ?: uiState.lastAction ?: "",
-                    modifier = Modifier.padding(16.dp),
-                    color = if (uiState.error != null)
-                        MaterialTheme.colorScheme.onErrorContainer
-                    else
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
-        }
-
+        // Card para agregar o editar notas
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -372,147 +312,80 @@ fun UsuarioAppWrapper(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Agregar Usuario",
+                    text = if (notaSeleccionadaId == null) "Agregar Nota" else "Editar Nota",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
 
                 OutlinedTextField(
-                    value = nombre,
-                    onValueChange = {
-                        nombre = it
-                        viewModel.clearMessages()
-                    },
-                    label = { Text("Nombre") },
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = uiState.error?.contains("nombre", ignoreCase = true) == true
+                    value = titulo,
+                    onValueChange = { titulo = it },
+                    label = { Text("Titulo de Nota") },
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
-                    value = edad,
-                    onValueChange = {
-                        edad = it
-                        viewModel.clearMessages()
-                    },
-                    label = { Text("Edad") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    isError = uiState.error?.contains("edad", ignoreCase = true) == true
+                    value = contenido,
+                    onValueChange = { contenido = it },
+                    label = { Text("Nota") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(100.dp) // Hacerlo más alto para contenido
                 )
 
-                Button(
-                    onClick = {
-                        if (nombre.isNotBlank() && edad.isNotBlank()) {
-                            viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
-                            nombre = ""
-                            edad = ""
-                        } else {
-                            viewModel.insertUsuario(nombre, edad.toIntOrNull() ?: 0)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            viewModel.addOrUpdateNota(notaSeleccionadaId, titulo, contenido)
+                            // Limpiar formulario
+                            titulo = ""
+                            contenido = ""
+                            notaSeleccionadaId = null
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (notaSeleccionadaId == null) "Guardar Nota" else "Actualizar Nota")
+                    }
+
+                    if (notaSeleccionadaId != null) {
+                        TextButton(onClick = {
+                            titulo = ""
+                            contenido = ""
+                            notaSeleccionadaId = null
+                        }) {
+                            Text("Cancelar")
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !uiState.isLoading
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text("Guardar Usuario")
                 }
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Usuarios (${usuarios.size})",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                if (uiState.isLoading) {
-                    Text(
-                        text = "Cargando...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
+        Text(
+            text = "Notas (${notas.size})",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(
-                    onClick = {
-                        viewModel.forceSync()
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CloudSync,
-                        contentDescription = "Sincronizar con WorkManager",
-                        tint = if (workStatus == "Sincronizando...")
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        viewModel.manualSync()
-                    },
-                    enabled = !uiState.isLoading
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sincronización manual"
-                        )
-                    }
-                }
-
-                Text(
-                    text = workStatus,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = when (workStatus) {
-                        "Sincronizando..." -> MaterialTheme.colorScheme.primary
-                        "Completado" -> MaterialTheme.colorScheme.tertiary
-                        "Programado" -> MaterialTheme.colorScheme.secondary
-                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    }
-                )
-            }
-        }
-
-        if (uiState.hasUsers) {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(
-                    items = usuarios,
-                    key = { usuario -> usuario.id }
-                ) { usuario ->
-                    UsuarioItem(
-                        usuario = usuario,
-                        onDelete = { viewModel.deleteUsuario(usuario) },
-                        isLoading = uiState.isLoading
+        // Lista de notas
+        if (notas.isNotEmpty()) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(items = notas, key = { nota -> nota.id }) { nota ->
+                    NotaItem(
+                        nota = nota,
+                        onEdit = {
+                            titulo = nota.title
+                            contenido = nota.content
+                            notaSeleccionadaId = nota.id
+                        },
+                        onDelete = { viewModel.deleteNota(nota) }
                     )
                 }
             }
         } else {
+            // Placeholder si no hay notas
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -529,17 +402,14 @@ fun UsuarioAppWrapper(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Icon(Icons.Default.Notes, contentDescription = null, modifier = Modifier.size(48.dp))
                         Text(
-                            text = "👥",
-                            style = MaterialTheme.typography.headlineLarge
-                        )
-                        Text(
-                            text = "No hay usuarios",
+                            text = "No hay notas",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = "Agrega el primer usuario",
+                            text = "Agrega la primera nota",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
@@ -551,10 +421,10 @@ fun UsuarioAppWrapper(
 }
 
 @Composable
-fun UsuarioItem(
-    usuario: Usuario,
-    onDelete: () -> Unit,
-    isLoading: Boolean = false
+fun NotaItem(
+    nota: Nota,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -563,43 +433,35 @@ fun UsuarioItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = usuario.nombre,
+                    text = nota.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "${usuario.edad} años",
+                    text = nota.content,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-                Text(
-                    text = "ID: ${usuario.id.take(8)}...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    maxLines = 2
                 )
             }
-
-            IconButton(
-                onClick = onDelete,
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
+            Row {
+                IconButton(onClick = onEdit) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Editar Nota",
+                        tint = MaterialTheme.colorScheme.secondary
                     )
-                } else {
+                }
+                IconButton(onClick = onDelete) {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Eliminar usuario",
+                        contentDescription = "Eliminar Nota",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -607,6 +469,7 @@ fun UsuarioItem(
         }
     }
 }
+
 
 @Preview(showBackground = true)
 @Composable

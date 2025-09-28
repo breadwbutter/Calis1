@@ -1,33 +1,35 @@
 package com.example.calis1.data.database
 
+import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import android.content.Context
-import com.example.calis1.data.dao.UsuarioDao
 import com.example.calis1.data.dao.AlcoholRecordDao
-import com.example.calis1.data.entity.Usuario
+import com.example.calis1.data.dao.NotaDao // Importar el nuevo DAO
+import com.example.calis1.data.dao.UsuarioDao
 import com.example.calis1.data.entity.AlcoholRecord
+import com.example.calis1.data.entity.Nota // Importar la nueva entidad
+import com.example.calis1.data.entity.Usuario
 
 @Database(
-    entities = [Usuario::class, AlcoholRecord::class],
-    version = 2, // Incrementamos la versión
+    entities = [Usuario::class, AlcoholRecord::class, Nota::class], // 1. Agregar Nota::class
+    version = 3, // 2. Incrementar la versión a 3
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun usuarioDao(): UsuarioDao
     abstract fun alcoholRecordDao(): AlcoholRecordDao
+    abstract fun notaDao(): NotaDao // 3. Agregar el método abstracto para el DAO
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // Migración de versión 1 a 2 (agregar tabla alcohol_records)
+        // Migración existente
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Crear tabla alcohol_records
                 database.execSQL("""
                     CREATE TABLE IF NOT EXISTS `alcohol_records` (
                         `id` TEXT NOT NULL,
@@ -41,17 +43,29 @@ abstract class AppDatabase : RoomDatabase() {
                         `timestamp` INTEGER NOT NULL,
                         PRIMARY KEY(`id`)
                     )
-                """.trimIndent())
-
-                // Crear índices para mejorar el rendimiento
+                """)
                 database.execSQL("""
                     CREATE INDEX IF NOT EXISTS `index_alcohol_records_userId_semanaInicio` 
                     ON `alcohol_records` (`userId`, `semanaInicio`)
-                """.trimIndent())
-
+                """)
                 database.execSQL("""
                     CREATE INDEX IF NOT EXISTS `index_alcohol_records_userId_diaSemana` 
                     ON `alcohol_records` (`userId`, `diaSemana`)
+                """)
+            }
+        }
+
+        // 4. Crear la nueva migración de versión 2 a 3
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `notas` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
                 """.trimIndent())
             }
         }
@@ -63,7 +77,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .addMigrations(MIGRATION_1_2) // Agregar la migración
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // 5. Agregar la nueva migración
                     .build()
                 INSTANCE = instance
                 instance
