@@ -33,17 +33,14 @@ fun EventosScreen(
 
     val context = LocalContext.current
 
-    // Variables para el formulario
     var titulo by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
     var fecha by remember { mutableStateOf("") }
 
-    // Variables para validación
     var tituloError by remember { mutableStateOf("") }
     var descripcionError by remember { mutableStateOf("") }
     var fechaError by remember { mutableStateOf("") }
 
-    // Configurar usuario actual basado en el estado de autenticación
     LaunchedEffect(authState) {
         val userId = when (authState) {
             is AuthState.SignedIn -> authState.user.uid
@@ -54,7 +51,6 @@ fun EventosScreen(
         viewModel.setCurrentUser(userId)
     }
 
-    // Auto-limpiar mensajes después de 3 segundos
     LaunchedEffect(uiState.lastAction, uiState.error) {
         if (uiState.lastAction != null || uiState.error != null) {
             kotlinx.coroutines.delay(3000)
@@ -62,7 +58,6 @@ fun EventosScreen(
         }
     }
 
-    // Validaciones en tiempo real
     LaunchedEffect(titulo) {
         tituloError = when {
             titulo.isNotEmpty() && titulo.trim().length < 3 -> "El título debe tener al menos 3 caracteres"
@@ -120,7 +115,6 @@ fun EventosScreen(
             }
         }
 
-        // Mensaje de estado
         if (uiState.error != null || uiState.lastAction != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),

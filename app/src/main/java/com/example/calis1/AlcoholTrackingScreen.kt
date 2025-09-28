@@ -50,14 +50,12 @@ fun AlcoholTrackingScreen(
     val registrosSemana by viewModel.registrosSemana.collectAsState()
     val totalAlcoholPuro by viewModel.totalAlcoholPuro.collectAsState()
 
-    // NUEVO: Obtener configuraciones de unidades
     val configuraciones by settingsRepository.getConfiguraciones()
         .collectAsState(initial = AppConfiguraciones()) // <-- CORRECCIÓN AQUÍ
     val sistemaUnidades = configuraciones.sistemaUnidades
 
     val context = LocalContext.current
 
-    // Configurar usuario actual basado en el estado de autenticación
     LaunchedEffect(authState) {
         val userId = when (authState) {
             is AuthState.SignedIn -> authState.user.uid
@@ -68,7 +66,6 @@ fun AlcoholTrackingScreen(
         viewModel.setCurrentUser(userId)
     }
 
-    // Observar estado de WorkManager
     val workManager = WorkManager.getInstance(context)
     var workStatus by remember { mutableStateOf("Inactivo") }
 
@@ -84,7 +81,6 @@ fun AlcoholTrackingScreen(
             }
     }
 
-    // Auto-limpiar mensajes después de 3 segundos
     LaunchedEffect(uiState.lastAction, uiState.error) {
         if (uiState.lastAction != null || uiState.error != null) {
             kotlinx.coroutines.delay(3000)
@@ -92,14 +88,12 @@ fun AlcoholTrackingScreen(
         }
     }
 
-    // Column principal SIN Scaffold (se usa el del MainActivity)
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Snackbar para mensajes de estado
         if (uiState.error != null || uiState.lastAction != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -126,7 +120,6 @@ fun AlcoholTrackingScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            // Header con navegación de semana
             item {
                 SemanaNavigationCard(
                     rangoSemana = viewModel.getRangoSemana(),
@@ -137,7 +130,6 @@ fun AlcoholTrackingScreen(
                 )
             }
 
-            // Resumen de alcohol y estado de salud - MODIFICADO
             item {
                 ResumenAlcoholCard(
                     totalAlcoholPuro = totalAlcoholPuro,
@@ -146,7 +138,6 @@ fun AlcoholTrackingScreen(
                 )
             }
 
-            // Días de la semana (Domingo a Sábado) - MODIFICADO
             items(7) { index ->
                 val diaSemana = index + 1 // 1=Domingo, 2=Lunes, etc.
                 val registrosDia = uiState.registrosPorDia[diaSemana] ?: emptyList()
@@ -199,7 +190,6 @@ fun AlcoholTrackingScreen(
                 }
             }
 
-            // Espacio adicional al final
             item {
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -291,7 +281,6 @@ fun ResumenAlcoholCard(
     estadoSalud: EstadoSalud,
     sistemaUnidades: SistemaUnidades // NUEVO: Sistema de unidades
 ) {
-    // NUEVO: Convertir valores según sistema de unidades
     val totalMostrar = when (sistemaUnidades) {
         SistemaUnidades.MILILITROS -> totalAlcoholPuro
         SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(totalAlcoholPuro)
@@ -357,7 +346,6 @@ fun ResumenAlcoholCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Total de alcohol puro - MODIFICADO para mostrar unidades correctas
             Text(
                 text = "Total de alcohol puro: ${
                     ConvertirUnidades.formatearConUnidades(
@@ -369,7 +357,6 @@ fun ResumenAlcoholCard(
                 fontWeight = FontWeight.Medium
             )
 
-            // Barra de progreso visual (siempre basada en ml para cálculo)
             LinearProgressIndicator(
                 progress = (totalAlcoholPuro / 280.0).toFloat().coerceAtMost(1f),
                 modifier = Modifier
@@ -384,7 +371,6 @@ fun ResumenAlcoholCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
-            // MODIFICADO: Mostrar límite en unidades correctas
             Text(
                 text = "Límite recomendado: ${
                     ConvertirUnidades.formatearConUnidades(
@@ -413,7 +399,6 @@ fun DiaAlcoholCard(
     var expanded by remember { mutableStateOf(false) }
     var editingRegistroId by remember { mutableStateOf<String?>(null) }
 
-    // Estados para formulario (siempre limpios para nuevo registro)
     var nombreBebida by remember { mutableStateOf("") }
     var mililitros by remember { mutableStateOf("") }
     var porcentajeAlcohol by remember { mutableStateOf("") }
@@ -434,10 +419,8 @@ fun DiaAlcoholCard(
         else -> "Día"
     }
 
-    // Calcular total de alcohol del día
     val totalAlcoholDia = registros.sumOf { it.calcularAlcoholPuro() }
 
-    // NUEVO: Convertir para mostrar
     val totalMostrar = when (sistemaUnidades) {
         SistemaUnidades.MILILITROS -> totalAlcoholDia
         SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(totalAlcoholDia)
@@ -488,7 +471,6 @@ fun DiaAlcoholCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
-                            // MODIFICADO: Mostrar unidades correctas
                             Text(
                                 text = "${
                                     ConvertirUnidades.formatearConUnidades(
@@ -519,7 +501,6 @@ fun DiaAlcoholCard(
                 }
             }
 
-            // Lista de registros existentes (cuando está colapsado)
             if (registros.isNotEmpty() && !expanded) {
                 Spacer(modifier = Modifier.height(8.dp))
                 registros.forEach { registro ->
@@ -541,7 +522,6 @@ fun DiaAlcoholCard(
                 }
             }
 
-            // Contenido expandido
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -566,7 +546,6 @@ fun DiaAlcoholCard(
                             )
                         ) {
                             if (editingRegistroId == registro.id) {
-                                // Modo edición
                                 Column(
                                     modifier = Modifier.padding(12.dp),
                                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -628,7 +607,6 @@ fun DiaAlcoholCard(
                                     }
                                 }
                             } else {
-                                // Modo visualización
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

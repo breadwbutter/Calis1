@@ -43,7 +43,7 @@ data class AlcoholRecord(
         return (mililitros * porcentajeAlcohol) / 100.0
     }
 
-    // Obtener nombre del día en español
+
     fun getNombreDia(): String {
         return when (diaSemana) {
             1 -> "Domingo"

@@ -39,23 +39,19 @@ fun BuscadorScreen(
     viewModel: EventosViewModel = viewModel(),
     authState: AuthState
 ) {
-    // States del ViewModel
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
 
-    // Estados locales para la UI
     var showAdvancedSearch by remember { mutableStateOf(false) }
     var buscarTitulo by remember { mutableStateOf(true) }
     var buscarDescripcion by remember { mutableStateOf(true) }
     var buscarFecha by remember { mutableStateOf(true) }
 
-    // Estados para el teclado y focus
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
 
-    // Configurar usuario actual basado en el estado de autenticación
     LaunchedEffect(authState) {
         val userId = when (authState) {
             is AuthState.SignedIn -> authState.user.uid
@@ -66,7 +62,6 @@ fun BuscadorScreen(
         viewModel.setCurrentUser(userId)
     }
 
-    // Auto-limpiar mensajes después de 3 segundos
     LaunchedEffect(uiState.lastAction, uiState.error) {
         if (uiState.lastAction != null || uiState.error != null) {
             kotlinx.coroutines.delay(3000)
@@ -74,7 +69,6 @@ fun BuscadorScreen(
         }
     }
 
-    // Enfocar automáticamente la barra de búsqueda al abrir la pantalla
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
@@ -85,7 +79,6 @@ fun BuscadorScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Título de la pantalla
         Text(
             text = "Buscador de Eventos",
             style = MaterialTheme.typography.headlineMedium,
@@ -94,7 +87,6 @@ fun BuscadorScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Card de búsqueda principal
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
@@ -104,7 +96,6 @@ fun BuscadorScreen(
                 modifier = Modifier.padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Barra de búsqueda
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.updateSearchQuery(it) },
@@ -117,7 +108,6 @@ fun BuscadorScreen(
                     },
                     trailingIcon = {
                         Row {
-                            // Botón de búsqueda
                             IconButton(
                                 onClick = {
                                     keyboardController?.hide()
@@ -188,7 +178,6 @@ fun BuscadorScreen(
                     )
                 )
 
-                // Botón para mostrar/ocultar búsqueda avanzada
                 OutlinedButton(
                     onClick = { showAdvancedSearch = !showAdvancedSearch },
                     modifier = Modifier.fillMaxWidth(),
@@ -203,7 +192,6 @@ fun BuscadorScreen(
                     Text("Búsqueda avanzada")
                 }
 
-                // Opciones de búsqueda avanzada (animadas)
                 AnimatedVisibility(
                     visible = showAdvancedSearch,
                     enter = expandVertically(animationSpec = tween(300)) + fadeIn(),
@@ -275,7 +263,6 @@ fun BuscadorScreen(
             }
         }
 
-        // Mensaje de estado
         if (uiState.error != null || uiState.lastAction != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -313,7 +300,6 @@ fun BuscadorScreen(
             }
         }
 
-        // Resultados de búsqueda
         if (searchResults.isNotEmpty()) {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -332,7 +318,6 @@ fun BuscadorScreen(
                 }
             }
         } else if (searchQuery.isNotEmpty() && !isSearching && uiState.lastAction?.contains("No se encontraron") == true) {
-            // Placeholder cuando no hay resultados
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -371,7 +356,6 @@ fun BuscadorScreen(
                 }
             }
         } else if (searchQuery.isEmpty()) {
-            // Placeholder inicial
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -438,7 +422,6 @@ fun BuscadorEventoCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header con título y botón eliminar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -459,7 +442,6 @@ fun BuscadorEventoCard(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Badge con fecha
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -474,7 +456,6 @@ fun BuscadorEventoCard(
                         )
                     }
 
-                    // Botón eliminar
                     IconButton(
                         onClick = { showDeleteDialog = true },
                         enabled = enabled,
@@ -490,7 +471,6 @@ fun BuscadorEventoCard(
                 }
             }
 
-            // Descripción
             Text(
                 text = evento.descripcion,
                 style = MaterialTheme.typography.bodyMedium,
@@ -499,7 +479,6 @@ fun BuscadorEventoCard(
                 overflow = TextOverflow.Ellipsis
             )
 
-            // Footer con timestamp e indicador de coincidencia
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -522,7 +501,6 @@ fun BuscadorEventoCard(
                     )
                 }
 
-                // Indicadores de coincidencia
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -564,7 +542,6 @@ fun BuscadorEventoCard(
         }
     }
 
-    // Diálogo de confirmación de eliminación
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },

@@ -12,15 +12,12 @@ import kotlinx.coroutines.launch
 class EventosViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: EventosRepository
 
-    // Estados reactivos con StateFlow
     private val _uiState = MutableStateFlow(EventosUiState())
     val uiState: StateFlow<EventosUiState> = _uiState.asStateFlow()
 
-    // Usuario actual (será establecido desde MainActivity)
     private val _currentUserId = MutableStateFlow("")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 
-    // NUEVO: Estado para búsqueda
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -30,17 +27,14 @@ class EventosViewModel(application: Application) : AndroidViewModel(application)
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
-    // Flow de eventos directo desde repository
     val allEventos: StateFlow<List<Evento>>
 
-    // Flow de conteo de eventos
     val eventosCount: StateFlow<Int>
 
     init {
         val eventoDao = AppDatabase.getDatabase(application).eventoDao()
         repository = EventosRepository(eventoDao, application.applicationContext)
 
-        // Convertir Flow a StateFlow para mejor control
         allEventos = currentUserId.flatMapLatest { userId ->
             if (userId.isNotEmpty()) {
                 repository.getAllEventos(userId)

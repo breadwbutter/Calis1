@@ -31,9 +31,7 @@ class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private var sessionManager: SessionManager? = null
 
-    /**
-     * Inicializar con contexto y verificar sesión existente
-     */
+
     fun initialize(context: Context) {
         println("🔍 DEBUG: Inicializando AuthViewModel...")
         if (sessionManager == null) {
@@ -45,9 +43,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Verificar si hay una sesión activa al iniciar la app
-     */
+
     private fun checkExistingSession() {
         println("🔍 DEBUG: Verificando sesión existente...")
         viewModelScope.launch {
@@ -102,9 +98,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Registrar nuevo usuario con email y contraseña
-     */
+
     fun registerUser(email: String, password: String, confirmPassword: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -163,17 +157,13 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Login con email registrado
-     */
+
     fun signInWithEmail(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
 
-            // Simular pequeño delay para mostrar loading
             kotlinx.coroutines.delay(500)
 
-            // Validaciones básicas
             when {
                 email.isBlank() -> {
                     _authState.value = AuthState.Error("Por favor ingresa tu email")
@@ -193,7 +183,6 @@ class AuthViewModel : ViewModel() {
             val isValid = sessionManager?.verifyUserCredentials(email.trim(), password) ?: false
 
             if (isValid) {
-                // Guardar sesión
                 sessionManager?.saveSession(
                     loginType = SessionManager.LOGIN_TYPE_EMAIL,
                     email = email.trim()
@@ -207,9 +196,7 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Login tradicional (admin@gmail.com / 123456)
-     */
+
     fun signInTraditional(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -233,18 +220,14 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Limpiar sesión anterior (para cambio de tipo de login)
-     */
+
     fun clearPreviousSession() {
         println("🔍 DEBUG: Limpiando sesión anterior...")
         sessionManager?.clearSession()
         println("🔍 DEBUG: Sesión anterior limpiada")
     }
 
-    /**
-     * Login con Google con persistencia (versión mejorada sin cancelación)
-     */
+
     fun signInWithGoogle(context: Context) {
         println("🔍 DEBUG: Iniciando login con Google desde ViewModel...")
 
@@ -255,7 +238,6 @@ class AuthViewModel : ViewModel() {
 
                 val credentialManager = CredentialManager.create(context)
 
-                // Generate secure nonce for replay attack prevention
                 val rawNonce = UUID.randomUUID().toString()
                 val hashedNonce = MessageDigest.getInstance("SHA-256")
                     .digest(rawNonce.toByteArray())
@@ -266,7 +248,6 @@ class AuthViewModel : ViewModel() {
                 val webClientId = context.getString(R.string.web_client_id)
                 println("🔍 DEBUG: Web Client ID completo: $webClientId")
 
-                // Configure Google Sign-In option
                 val googleIdOption = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false) // Allow new users
                     .setServerClientId(webClientId)
@@ -276,7 +257,6 @@ class AuthViewModel : ViewModel() {
 
                 println("🔍 DEBUG: Google ID Option configurado")
 
-                // Create credential request
                 val request = GetCredentialRequest.Builder()
                     .addCredentialOption(googleIdOption)
                     .build()
@@ -311,66 +291,62 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Manejar resultado del login de Google
-     */
+
     private suspend fun handleSignInResult(result: GetCredentialResponse) {
-        println("🔍 DEBUG: Manejando resultado del login...")
+        println(" DEBUG: Manejando resultado del login...")
 
         when (val credential = result.credential) {
             is CustomCredential -> {
-                println("🔍 DEBUG: Credencial customizada recibida")
-                println("🔍 DEBUG: Tipo de credencial: ${credential.type}")
+                println(" DEBUG: Credencial customizada recibida")
+                println("DEBUG: Tipo de credencial: ${credential.type}")
 
                 if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                     try {
-                        println("🔍 DEBUG: Procesando token de Google...")
+                        println(" DEBUG: Procesando token de Google...")
 
                         val googleIdTokenCredential = GoogleIdTokenCredential
                             .createFrom(credential.data)
                         val idToken = googleIdTokenCredential.idToken
 
-                        println("🔍 DEBUG: Token extraído, autenticando con Firebase...")
+                        println(" DEBUG: Token extraído, autenticando con Firebase...")
 
-                        // Create Firebase credential and sign in
                         val firebaseCredential = GoogleAuthProvider
                             .getCredential(idToken, null)
                         val authResult = auth.signInWithCredential(firebaseCredential).await()
 
-                        println("🔍 DEBUG: Autenticación con Firebase completada")
+                        println(" DEBUG: Autenticación con Firebase completada")
 
                         authResult.user?.let { user ->
-                            println("🔍 DEBUG: Usuario obtenido: ${user.displayName} (${user.email})")
+                            println(" DEBUG: Usuario obtenido: ${user.displayName} (${user.email})")
 
-                            // Guardar sesión exitosa
                             sessionManager?.saveSession(
                                 loginType = SessionManager.LOGIN_TYPE_GOOGLE,
                                 user = user
                             )
 
-                            println("🔍 DEBUG: Sesión guardada, actualizando estado...")
+                            println(" DEBUG: Sesión guardada, actualizando estado...")
                             _authState.value = AuthState.SignedIn(user)
-                            println("✅ DEBUG: Login completado exitosamente!")
+                            println(" DEBUG: Login completado exitosamente!")
                         } ?: run {
-                            println("❌ DEBUG: Usuario nulo después de autenticación")
+                            println(" DEBUG: Usuario nulo después de autenticación")
                             _authState.value = AuthState.Error("Error al iniciar sesión: Usuario nulo")
                         }
 
                     } catch (e: GoogleIdTokenParsingException) {
-                        println("❌ DEBUG: Error parseando token: ${e.message}")
+                        println(" DEBUG: Error parseando token: ${e.message}")
                         _authState.value = AuthState.Error("Token de Google ID inválido")
                     } catch (e: Exception) {
-                        println("❌ DEBUG: Error en autenticación Firebase: ${e.message}")
+                        println(" DEBUG: Error en autenticación Firebase: ${e.message}")
                         e.printStackTrace()
                         _authState.value = AuthState.Error("Error al autenticar con Firebase: ${e.message}")
                     }
                 } else {
-                    println("❌ DEBUG: Tipo de credencial no reconocido: ${credential.type}")
+                    println(" DEBUG: Tipo de credencial no reconocido: ${credential.type}")
                     _authState.value = AuthState.Error("Tipo de credencial no soportado")
                 }
             }
             else -> {
-                println("❌ DEBUG: Credencial no es CustomCredential: ${credential::class.java}")
+                println(" DEBUG: Credencial no es CustomCredential: ${credential::class.java}")
                 _authState.value = AuthState.Error("Tipo de credencial no reconocido")
             }
         }
@@ -382,32 +358,32 @@ class AuthViewModel : ViewModel() {
     fun signOut(context: Context) {
         viewModelScope.launch {
             try {
-                println("🔍 DEBUG: Iniciando logout...")
+                println(" DEBUG: Iniciando logout...")
 
                 // Limpiar sesión persistente
                 sessionManager?.clearSession()
-                println("🔍 DEBUG: Sesión persistente limpiada")
+                println(" DEBUG: Sesión persistente limpiada")
 
                 // Limpiar Firebase Auth (por si había usuario de Google)
                 auth.signOut()
-                println("🔍 DEBUG: Firebase Auth limpiado")
+                println(" DEBUG: Firebase Auth limpiado")
 
                 // Limpiar Credential Manager
                 try {
                     val credentialManager = CredentialManager.create(context)
                     credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                    println("🔍 DEBUG: Credential Manager limpiado")
+                    println(" DEBUG: Credential Manager limpiado")
                 } catch (e: ClearCredentialException) {
                     // Log error but continue with logout
-                    println("⚠️ DEBUG: Error limpiando credential state: ${e.message}")
+                    println("⚠ DEBUG: Error limpiando credential state: ${e.message}")
                 }
 
                 // Limpiar estado local
                 _authState.value = AuthState.SignedOut
-                println("✅ DEBUG: Logout completado")
+                println(" DEBUG: Logout completado")
 
             } catch (e: Exception) {
-                println("❌ DEBUG: Error durante logout: ${e.message}")
+                println(" DEBUG: Error durante logout: ${e.message}")
                 // Forzar logout incluso si hay error
                 sessionManager?.clearSession()
                 _authState.value = AuthState.SignedOut

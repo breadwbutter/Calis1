@@ -468,10 +468,10 @@ fun DialogoBorrarDatos(
                 Text(
                     buildAnnotatedString {
                         append("Esta acción eliminará permanentemente:\n\n")
-                        append("🗃️ Todos los registros de alcohol\n")
-                        append("📝 Todas las notas guardadas\n")
-                        append("📅 Todos los eventos creados\n")
-                        append("⚙️ Configuraciones de la app\n\n")
+                        append(" Todos los registros de alcohol\n")
+                        append(" Todas las notas guardadas\n")
+                        append(" Todos los eventos creados\n")
+                        append(" Configuraciones de la app\n\n")
                         append("Esta acción NO SE PUEDE DESHACER.")
                     },
                     style = MaterialTheme.typography.bodyMedium

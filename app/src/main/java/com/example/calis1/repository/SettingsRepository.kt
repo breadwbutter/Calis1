@@ -87,13 +87,7 @@ class SettingsRepository(private val context: Context) {
         _configuraciones.value = _configuraciones.value.copy(sistemaUnidades = nuevoSistema)
     }
 
-    /**
-     * Borrar todos los datos del usuario
-     * Esta función elimina:
-     * 1. Todos los datos de Room (local)
-     * 2. Todos los datos de Firebase (remoto)
-     * 3. Configuraciones de la app (opcional - se mantienen por UX)
-     */
+
     suspend fun borrarTodosLosDatos(userId: String) {
         try {
             // 1. Borrar datos locales (Room)
@@ -105,9 +99,7 @@ class SettingsRepository(private val context: Context) {
             // 3. Detener sincronización
             detenerSincronizacion()
 
-            // Nota: Las configuraciones de tema y unidades se mantienen para mejor UX
-            // Si quieres borrarlas también, descomenta las siguientes líneas:
-            // borrarConfiguraciones()
+
 
         } catch (e: Exception) {
             throw Exception("Error al eliminar todos los datos: ${e.message}")
@@ -123,16 +115,14 @@ class SettingsRepository(private val context: Context) {
         val notaDao = database.notaDao()
         val eventoDao = database.eventoDao()
 
-        // Borrar datos específicos del usuario
+
         alcoholRecordDao.deleteAllRegistrosUsuario(userId)
         eventoDao.deleteAllEventosUsuario(userId)
 
-        // Borrar todas las notas (no tienen userId en el esquema actual)
-        val todasLasNotas = notaDao.getAllNotas()
-        // Nota: Como las notas no tienen userId, se borran todas
-        // En una versión futura, deberías agregar userId a las notas
 
-        // Borrar todos los usuarios si es admin, o datos relacionados
+        val todasLasNotas = notaDao.getAllNotas()
+
+
         if (userId == "admin") {
             usuarioDao.deleteAllUsuarios()
         }

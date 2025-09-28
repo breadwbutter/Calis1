@@ -13,11 +13,9 @@ import java.time.LocalDate
 class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: AlcoholTrackingRepository
 
-    // Estados reactivos con StateFlow
     private val _uiState = MutableStateFlow(AlcoholTrackingUiState())
     val uiState: StateFlow<AlcoholTrackingUiState> = _uiState.asStateFlow()
 
-    // Usuario actual (será establecido desde MainActivity)
     private val _currentUserId = MutableStateFlow("")
     private val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 
@@ -35,7 +33,6 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
         val alcoholRecordDao = AppDatabase.getDatabase(application).alcoholRecordDao()
         repository = AlcoholTrackingRepository(alcoholRecordDao, application.applicationContext)
 
-        // Configurar Flow combinado para registros de semana
         registrosSemana = combine(
             currentUserId,
             semanaActual
@@ -52,7 +49,6 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
                 initialValue = emptyList()
             )
 
-        // Calcular total de alcohol puro
         totalAlcoholPuro = registrosSemana
             .map { registros ->
                 registros.sumOf { it.calcularAlcoholPuro() }
@@ -63,7 +59,6 @@ class AlcoholTrackingViewModel(application: Application) : AndroidViewModel(appl
                 initialValue = 0.0
             )
 
-        // Observar cambios para actualizar UI state
         observeChanges()
     }
 

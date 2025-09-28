@@ -184,7 +184,7 @@ fun UserInfoCard(userData: UserDisplayData) {
 @Composable
 fun UserActionsCard(
     onLogoutClick: () -> Unit,
-    onSettingsClick: () -> Unit // NUEVO: Parámetro para configuraciones
+    onSettingsClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),

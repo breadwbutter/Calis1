@@ -12,10 +12,8 @@ data class Usuario(
     val edad: Int = 0,
     val timestamp: Long = System.currentTimeMillis()
 ) {
-    // Constructor sin argumentos para Firebase
     constructor() : this("", "", 0, 0L)
 
-    // Convertir a Map para Firebase
     fun toMap(): Map<String, Any> {
         return mapOf(
             "id" to id,

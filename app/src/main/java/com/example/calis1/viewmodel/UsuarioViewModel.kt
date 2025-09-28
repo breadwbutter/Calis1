@@ -12,21 +12,17 @@ import kotlinx.coroutines.launch
 class UsuarioViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: UsuarioRepository
 
-    // Estados reactivos con StateFlow
     private val _uiState = MutableStateFlow(UsuarioUiState())
     val uiState: StateFlow<UsuarioUiState> = _uiState.asStateFlow()
 
-    // Flow de usuarios directo desde repository
     val allUsuarios: StateFlow<List<Usuario>>
 
-    // Flow de conteo de usuarios
     val usuariosCount: StateFlow<Int>
 
     init {
         val usuarioDao = AppDatabase.getDatabase(application).usuarioDao()
         repository = UsuarioRepository(usuarioDao, application.applicationContext)
 
-        // Convertir Flow a StateFlow para mejor control
         allUsuarios = repository.getAllUsuarios()
             .stateIn(
                 scope = viewModelScope,
@@ -41,10 +37,8 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
                 initialValue = 0
             )
 
-        // Configurar sincronización completa (tiempo real + WorkManager)
         setupCompleteSync()
 
-        // Observar cambios en la lista para actualizar estado
         observeUsuarios()
     }
 
@@ -112,7 +106,6 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Configurar sincronización completa
     private fun setupCompleteSync() {
         repository.setupCompleteSync()
     }
@@ -136,7 +129,6 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Método para forzar sincronización inmediata con WorkManager
     fun forceSync() {
         repository.forceSync()
         _uiState.value = _uiState.value.copy(
@@ -160,7 +152,6 @@ class UsuarioViewModel(application: Application) : AndroidViewModel(application)
         )
     }
 
-    // Limpiar recursos cuando el ViewModel se destruya
     override fun onCleared() {
         super.onCleared()
         repository.cleanup()

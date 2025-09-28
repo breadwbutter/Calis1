@@ -11,21 +11,17 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: SettingsRepository
 
-    // Estados reactivos con StateFlow
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    // Usuario actual
     private val _currentUserId = MutableStateFlow("")
     val currentUserId: StateFlow<String> = _currentUserId.asStateFlow()
 
-    // Configuraciones de la aplicación
     val configuraciones: StateFlow<AppConfiguraciones>
 
     init {
         repository = SettingsRepository(application.applicationContext)
 
-        // Cargar configuraciones desde el repository
         configuraciones = repository.getConfiguraciones()
             .stateIn(
                 scope = viewModelScope,

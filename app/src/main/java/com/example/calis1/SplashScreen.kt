@@ -23,15 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.example.calis1.ui.theme.Calis1Theme
 import kotlinx.coroutines.delay
 
-/**
- * Splash Screen con animación para BeerBattle
- * Duración total: 3 segundos
- *
- * Animaciones:
- * - Logo: Scale + Alpha (aparece creciendo)
- * - Texto: Fade in con delay
- * - Fondo: Gradiente temático
- */
+
 @Composable
 fun SplashScreen(
     onSplashFinished: () -> Unit
@@ -147,59 +139,6 @@ fun SplashScreen(
     }
 }
 
-/**
- * Modificaciones necesarias en MainActivity.kt:
- *
- * 1. Agregar estado para controlar splash
- * 2. Mostrar splash antes que AuthViewModel
- * 3. Integrar con el flujo existente
- */
-
-// =====================================================
-// CODIGO PARA AGREGAR A MainActivity.kt
-// =====================================================
-
-/*
-En la función MainApp(), reemplazar el contenido con:
-
-@Composable
-fun MainApp() {
-    val authViewModel: AuthViewModel = viewModel()
-    val context = LocalContext.current
-
-    // NUEVO: Estado para controlar splash screen
-    var showSplash by remember { mutableStateOf(true) }
-
-    // Estados existentes
-    val authState by authViewModel.authState.collectAsState()
-
-    // NUEVO: Mostrar splash screen primero
-    if (showSplash) {
-        SplashScreen(
-            onSplashFinished = {
-                showSplash = false
-                // Inicializar AuthViewModel después del splash
-                authViewModel.initialize(context)
-            }
-        )
-        return
-    }
-
-    // El resto del código existente permanece igual...
-    // Inicializar el AuthViewModel con contexto SOLO después del splash
-    LaunchedEffect(Unit) {
-        if (!showSplash) {
-            println("🔍 DEBUG: MainActivity - Inicializando AuthViewModel...")
-            authViewModel.initialize(context)
-        }
-    }
-
-    // Determinar si mostrar la pantalla principal o login
-    when (authState) {
-        // ... resto del código existente sin cambios
-    }
-}
-*/
 
 @Preview(showBackground = true)
 @Composable

@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     authViewModel: AuthViewModel = viewModel(),
-    onLoginSuccess: () -> Unit = {} // Ahora es opcional, el estado se maneja automáticamente
+    onLoginSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val authState by authViewModel.authState.collectAsState()
@@ -59,15 +59,15 @@ fun LoginScreen(
 
     // Limpiar mensajes cuando cambia el estado
     LaunchedEffect(authState) {
-        println("🔍 DEBUG: Estado cambiado a: $authState")
+        println("DEBUG: Estado cambiado a: $authState")
         when (authState) {
             is AuthState.Error -> {
-                println("❌ DEBUG: Error en estado: ${(authState as AuthState.Error).message}")
+                println(" DEBUG: Error en estado: ${(authState as AuthState.Error).message}")
                 errorMessage = (authState as AuthState.Error).message
                 successMessage = ""
             }
             is AuthState.RegistrationSuccess -> {
-                println("✅ DEBUG: Registro exitoso: ${(authState as AuthState.RegistrationSuccess).message}")
+                println(" DEBUG: Registro exitoso: ${(authState as AuthState.RegistrationSuccess).message}")
                 successMessage = (authState as AuthState.RegistrationSuccess).message
                 errorMessage = ""
                 // Cambiar a modo login después de registro exitoso
@@ -78,19 +78,19 @@ fun LoginScreen(
                 confirmPassword = ""
             }
             is AuthState.Loading -> {
-                println("🔄 DEBUG: Estado Loading")
+                println(" DEBUG: Estado Loading")
             }
             is AuthState.SignedIn -> {
-                println("✅ DEBUG: SignedIn con usuario: ${(authState as AuthState.SignedIn).user.email}")
+                println(" DEBUG: SignedIn con usuario: ${(authState as AuthState.SignedIn).user.email}")
             }
             is AuthState.TraditionalSignedIn -> {
-                println("✅ DEBUG: TraditionalSignedIn con usuario: ${(authState as AuthState.TraditionalSignedIn).username}")
+                println(" DEBUG: TraditionalSignedIn con usuario: ${(authState as AuthState.TraditionalSignedIn).username}")
             }
             is AuthState.EmailSignedIn -> {
-                println("✅ DEBUG: EmailSignedIn con email: ${(authState as AuthState.EmailSignedIn).email}")
+                println(" DEBUG: EmailSignedIn con email: ${(authState as AuthState.EmailSignedIn).email}")
             }
             is AuthState.SignedOut -> {
-                println("🔓 DEBUG: SignedOut")
+                println(" DEBUG: SignedOut")
                 if (errorMessage.isNotEmpty() && authState !is AuthState.Error) {
                     errorMessage = ""
                 }
@@ -101,7 +101,6 @@ fun LoginScreen(
         }
     }
 
-    // Limpiar mensajes de éxito después de 5 segundos
     LaunchedEffect(successMessage) {
         if (successMessage.isNotEmpty()) {
             kotlinx.coroutines.delay(5000)

@@ -28,11 +28,10 @@ class NotasViewModel(application: Application) : AndroidViewModel(application) {
             if (title.isBlank() || content.isBlank()) return@launch
 
             if (id == null) {
-                // Agregar nueva nota
                 val nuevaNota = Nota(title = title.trim(), content = content.trim())
                 repository.insertNota(nuevaNota)
             } else {
-                // Actualizar nota existente
+                // Actualizar
                 val notaActualizada = Nota(id = id, title = title.trim(), content = content.trim())
                 repository.updateNota(notaActualizada)
             }
