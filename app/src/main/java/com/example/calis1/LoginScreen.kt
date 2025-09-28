@@ -142,7 +142,7 @@ fun LoginScreen(
     ) {
         // Título de la app
         Text(
-            text = "Calis1",
+            text = "BeerBattle",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
@@ -446,7 +446,7 @@ fun LoginScreen(
                 // Información adicional
                 if (isLoginMode) {
                     Text(
-                        text = "Usa tu email registrado o admin@gmail.com (contraseña: 123456)",
+                        text = "No compartas tu email y contraseña con nadie :)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center,
