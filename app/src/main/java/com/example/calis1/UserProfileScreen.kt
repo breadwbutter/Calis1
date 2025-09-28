@@ -25,7 +25,8 @@ import com.example.calis1.viewmodel.AuthState
 @Composable
 fun UserProfileScreen(
     authState: AuthState,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToSettings: () -> Unit = {} // NUEVO: Callback para navegar a configuraciones
 ) {
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -47,9 +48,10 @@ fun UserProfileScreen(
         // Información del usuario
         UserInfoCard(userData)
 
-        // Configuraciones y acciones
+        // Configuraciones y acciones - MODIFICADO
         UserActionsCard(
-            onLogoutClick = { showLogoutDialog = true }
+            onLogoutClick = { showLogoutDialog = true },
+            onSettingsClick = onNavigateToSettings // NUEVO: Agregar callback
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -181,7 +183,8 @@ fun UserInfoCard(userData: UserDisplayData) {
 
 @Composable
 fun UserActionsCard(
-    onLogoutClick: () -> Unit
+    onLogoutClick: () -> Unit,
+    onSettingsClick: () -> Unit // NUEVO: Parámetro para configuraciones
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -197,10 +200,14 @@ fun UserActionsCard(
                 fontWeight = FontWeight.Bold
             )
 
+            // NUEVO: Botón de configuraciones
             OutlinedButton(
-                onClick = { /* TODO: Implementar configuraciones */ },
+                onClick = onSettingsClick,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -211,6 +218,29 @@ fun UserActionsCard(
                 Text("Configuraciones")
             }
 
+            // Botón existente de configuraciones (ahora como divider visual)
+            OutlinedButton(
+                onClick = { /* TODO: Implementar otras configuraciones */ },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                enabled = false // Deshabilitado temporalmente
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Preferencias (Próximamente)")
+            }
+
+            // Espaciador visual
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 8.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+            )
+
+            // Botón de cerrar sesión
             Button(
                 onClick = onLogoutClick,
                 modifier = Modifier.fillMaxWidth(),
@@ -348,7 +378,8 @@ fun UserProfileScreenPreview() {
     Calis1Theme {
         UserProfileScreen(
             authState = AuthState.TraditionalSignedIn("admin"),
-            onLogout = {}
+            onLogout = {},
+            onNavigateToSettings = {} // NUEVO: Agregar en preview
         )
     }
 }

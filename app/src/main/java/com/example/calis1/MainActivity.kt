@@ -26,6 +26,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.calis1.data.entity.Nota
 import com.example.calis1.navigation.NavigationRoutes
+import com.example.calis1.repository.SettingsRepository
 import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AlcoholTrackingViewModel
 import com.example.calis1.viewmodel.AuthState
@@ -38,15 +39,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            Calis1Theme {
-                MainApp()
+            // NUEVO: Crear el repository de configuraciones
+            val settingsRepository = remember { SettingsRepository(this) }
+
+            // NUEVO: Aplicar tema dinámico basado en configuraciones
+            Calis1Theme(settingsRepository = settingsRepository) {
+                MainApp(settingsRepository = settingsRepository)
             }
         }
     }
 }
 
 @Composable
-fun MainApp() {
+fun MainApp(settingsRepository: SettingsRepository) {
     val authViewModel: AuthViewModel = viewModel()
     val context = LocalContext.current
     val navController = rememberNavController()
@@ -79,6 +84,7 @@ fun MainApp() {
             MainAppWithNavigation(
                 navController = navController,
                 authState = authState,
+                settingsRepository = settingsRepository, // NUEVO: Pasar repository
                 onLogout = {
                     authViewModel.signOut(context)
                 }
@@ -99,6 +105,7 @@ fun MainApp() {
 fun MainAppWithNavigation(
     navController: NavHostController,
     authState: AuthState,
+    settingsRepository: SettingsRepository, // NUEVO: Parámetro para configuraciones
     onLogout: () -> Unit
 ) {
     val currentDestination by navController.currentBackStackEntryAsState()
@@ -114,9 +121,10 @@ fun MainAppWithNavigation(
                             NavigationRoutes.NOTAS -> "Notas"
                             NavigationRoutes.EVENTOS -> "Eventos"
                             NavigationRoutes.EVENTOS_LIST -> "Lista de Eventos"
-                            NavigationRoutes.BUSCADOR -> "Buscador de Eventos" // NUEVO: Título para buscador
+                            NavigationRoutes.BUSCADOR -> "Buscador de Eventos"
                             NavigationRoutes.PROFILE -> "Mi Perfil"
                             NavigationRoutes.HISTORY -> "Historial Semanal"
+                            NavigationRoutes.SETTINGS -> "Configuraciones" // NUEVO: Título para configuraciones
                             else -> "BeerBattle"
                         }
                     )
@@ -125,7 +133,8 @@ fun MainAppWithNavigation(
                     if (currentRoute != NavigationRoutes.PROFILE &&
                         currentRoute != NavigationRoutes.HISTORY &&
                         currentRoute != NavigationRoutes.EVENTOS_LIST &&
-                        currentRoute != NavigationRoutes.BUSCADOR) { // NUEVO: Excluir buscador
+                        currentRoute != NavigationRoutes.BUSCADOR &&
+                        currentRoute != NavigationRoutes.SETTINGS) { // NUEVO: Excluir configuraciones
 
                         // Botón de perfil
                         IconButton(
@@ -163,7 +172,8 @@ fun MainAppWithNavigation(
                 // Botón de navegación hacia atrás para pantallas secundarias
                 navigationIcon = {
                     if (currentRoute == NavigationRoutes.EVENTOS_LIST ||
-                        currentRoute == NavigationRoutes.BUSCADOR) { // NUEVO: Incluir buscador
+                        currentRoute == NavigationRoutes.BUSCADOR ||
+                        currentRoute == NavigationRoutes.SETTINGS) { // NUEVO: Incluir configuraciones
                         IconButton(
                             onClick = {
                                 navController.popBackStack()
@@ -182,7 +192,8 @@ fun MainAppWithNavigation(
             if (currentRoute != NavigationRoutes.PROFILE &&
                 currentRoute != NavigationRoutes.HISTORY &&
                 currentRoute != NavigationRoutes.EVENTOS_LIST &&
-                currentRoute != NavigationRoutes.BUSCADOR) { // NUEVO: Excluir buscador
+                currentRoute != NavigationRoutes.BUSCADOR &&
+                currentRoute != NavigationRoutes.SETTINGS) { // NUEVO: Excluir configuraciones
                 NavigationBottomBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
@@ -203,7 +214,8 @@ fun MainAppWithNavigation(
                 AlcoholTrackingScreenWrapper(
                     authState = authState,
                     paddingValues = PaddingValues(0.dp),
-                    navController = navController
+                    navController = navController,
+                    settingsRepository = settingsRepository // NUEVO: Pasar repository
                 )
             }
 
@@ -226,7 +238,6 @@ fun MainAppWithNavigation(
                 )
             }
 
-            // NUEVO: Composable para la pantalla de buscador
             composable(NavigationRoutes.BUSCADOR) {
                 BuscadorScreenWrapper(
                     authState = authState,
@@ -242,6 +253,21 @@ fun MainAppWithNavigation(
                         navController.navigate(NavigationRoutes.ALCOHOL_TRACKING) {
                             popUpTo(0) { inclusive = true }
                         }
+                    },
+                    // NUEVO: Agregar callback para navegar a configuraciones
+                    onNavigateToSettings = {
+                        navController.navigate(NavigationRoutes.SETTINGS)
+                    }
+                )
+            }
+
+            // NUEVO: Composable para la pantalla de configuraciones
+            composable(NavigationRoutes.SETTINGS) {
+                SettingsScreenWrapper(
+                    authState = authState,
+                    paddingValues = PaddingValues(0.dp),
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }
@@ -259,6 +285,7 @@ fun MainAppWithNavigation(
     }
 }
 
+// RESTO DE FUNCIONES EXISTENTES SIN CAMBIOS...
 @Composable
 fun NavigationBottomBar(
     currentRoute: String?,
@@ -328,7 +355,8 @@ fun LoadingScreen() {
 fun AlcoholTrackingScreenWrapper(
     authState: AuthState,
     paddingValues: PaddingValues,
-    navController: NavHostController
+    navController: NavHostController,
+    settingsRepository: SettingsRepository // NUEVO: Parámetro para configuraciones
 ) {
     val alcoholViewModel: AlcoholTrackingViewModel = viewModel()
 
@@ -340,6 +368,7 @@ fun AlcoholTrackingScreenWrapper(
         AlcoholTrackingScreen(
             viewModel = alcoholViewModel,
             authState = authState,
+            settingsRepository = settingsRepository, // NUEVO: Pasar repository
             onLogout = { /* Ya manejado en el nivel superior */ },
             onHistorialClick = {
                 navController.navigate(NavigationRoutes.HISTORY)
@@ -348,6 +377,26 @@ fun AlcoholTrackingScreenWrapper(
     }
 }
 
+// NUEVO: Wrapper para la pantalla de configuraciones
+@Composable
+fun SettingsScreenWrapper(
+    authState: AuthState,
+    paddingValues: PaddingValues,
+    onNavigateBack: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        SettingsScreen(
+            authState = authState,
+            onNavigateBack = onNavigateBack
+        )
+    }
+}
+
+// RESTO DE WRAPPERS SIN CAMBIOS...
 @Composable
 fun EventosScreenWrapper(
     authState: AuthState,
@@ -367,7 +416,6 @@ fun EventosScreenWrapper(
             onVerEventosClick = {
                 navController.navigate(NavigationRoutes.EVENTOS_LIST)
             },
-            // NUEVO: Agregar callback para navegar al buscador
             onBuscarEventosClick = {
                 navController.navigate(NavigationRoutes.BUSCADOR)
             }
@@ -394,7 +442,6 @@ fun EventosListScreenWrapper(
     }
 }
 
-// NUEVO: Wrapper para BuscadorScreen
 @Composable
 fun BuscadorScreenWrapper(
     authState: AuthState,
@@ -602,7 +649,8 @@ fun NotaItem(
 @Preview(showBackground = true)
 @Composable
 fun MainAppPreview() {
-    Calis1Theme {
-        MainApp()
+    val settingsRepository = SettingsRepository(LocalContext.current)
+    Calis1Theme(settingsRepository = settingsRepository) {
+        MainApp(settingsRepository = settingsRepository)
     }
 }

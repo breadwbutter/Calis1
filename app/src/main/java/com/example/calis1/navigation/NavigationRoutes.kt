@@ -10,4 +10,5 @@ object NavigationRoutes {
     const val LOGIN = "login"
     const val SPLASH = "splash"
     const val HISTORY = "history"
+    const val SETTINGS = "settings"
 }

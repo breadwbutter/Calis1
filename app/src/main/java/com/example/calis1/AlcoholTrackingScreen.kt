@@ -25,10 +25,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.calis1.data.entity.AlcoholRecord
+import com.example.calis1.repository.SettingsRepository
 import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AlcoholTrackingViewModel
+import com.example.calis1.viewmodel.AppConfiguraciones
 import com.example.calis1.viewmodel.AuthState
+import com.example.calis1.viewmodel.ConvertirUnidades
 import com.example.calis1.viewmodel.EstadoSalud
+import com.example.calis1.viewmodel.SistemaUnidades
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -36,14 +40,20 @@ import java.time.LocalDate
 fun AlcoholTrackingScreen(
     viewModel: AlcoholTrackingViewModel = viewModel(),
     authState: AuthState,
+    settingsRepository: SettingsRepository, // NUEVO: Repository de configuraciones
     onLogout: () -> Unit,
-    onHistorialClick: () -> Unit = {} // Función para historial (por ahora sin implementar)
+    onHistorialClick: () -> Unit = {}
 ) {
     // States del ViewModel
     val uiState by viewModel.uiState.collectAsState()
     val semanaActual by viewModel.semanaActual.collectAsState()
     val registrosSemana by viewModel.registrosSemana.collectAsState()
     val totalAlcoholPuro by viewModel.totalAlcoholPuro.collectAsState()
+
+    // NUEVO: Obtener configuraciones de unidades
+    val configuraciones by settingsRepository.getConfiguraciones()
+        .collectAsState(initial = AppConfiguraciones()) // <-- CORRECCIÓN AQUÍ
+    val sistemaUnidades = configuraciones.sistemaUnidades
 
     val context = LocalContext.current
 
@@ -63,14 +73,15 @@ fun AlcoholTrackingScreen(
     var workStatus by remember { mutableStateOf("Inactivo") }
 
     LaunchedEffect(Unit) {
-        workManager.getWorkInfosForUniqueWorkLiveData("periodic_alcohol_sync").observeForever { workInfos ->
-            workStatus = when {
-                workInfos.any { it.state == WorkInfo.State.RUNNING } -> "Sincronizando..."
-                workInfos.any { it.state == WorkInfo.State.ENQUEUED } -> "Programado"
-                workInfos.any { it.state == WorkInfo.State.SUCCEEDED } -> "Completado"
-                else -> "Inactivo"
+        workManager.getWorkInfosForUniqueWorkLiveData("periodic_alcohol_sync")
+            .observeForever { workInfos ->
+                workStatus = when {
+                    workInfos.any { it.state == WorkInfo.State.RUNNING } -> "Sincronizando..."
+                    workInfos.any { it.state == WorkInfo.State.ENQUEUED } -> "Programado"
+                    workInfos.any { it.state == WorkInfo.State.SUCCEEDED } -> "Completado"
+                    else -> "Inactivo"
+                }
             }
-        }
     }
 
     // Auto-limpiar mensajes después de 3 segundos
@@ -126,32 +137,34 @@ fun AlcoholTrackingScreen(
                 )
             }
 
-            // Resumen de alcohol y estado de salud
+            // Resumen de alcohol y estado de salud - MODIFICADO
             item {
                 ResumenAlcoholCard(
                     totalAlcoholPuro = totalAlcoholPuro,
-                    estadoSalud = uiState.estadoSalud
+                    estadoSalud = uiState.estadoSalud,
+                    sistemaUnidades = sistemaUnidades // NUEVO: Pasar sistema de unidades
                 )
             }
 
-            // Días de la semana (Domingo a Sábado)
+            // Días de la semana (Domingo a Sábado) - MODIFICADO
             items(7) { index ->
                 val diaSemana = index + 1 // 1=Domingo, 2=Lunes, etc.
-                val registrosDia = uiState.registrosPorDia[diaSemana] ?: emptyList() // CAMBIO: Lista de registros
+                val registrosDia = uiState.registrosPorDia[diaSemana] ?: emptyList()
                 val fechaDia = semanaActual.plusDays(index.toLong())
 
                 DiaAlcoholCard(
                     diaSemana = diaSemana,
                     fecha = fechaDia,
-                    registros = registrosDia, // CAMBIO: Pasar lista de registros
+                    registros = registrosDia,
+                    sistemaUnidades = sistemaUnidades, // NUEVO: Pasar sistema de unidades
                     isLoading = uiState.isLoading,
                     onActualizar = { nombre, ml, porcentaje ->
                         viewModel.actualizarRegistro(diaSemana, nombre, ml, porcentaje)
                     },
-                    onEliminar = { registroId -> // CAMBIO: Eliminar por ID
+                    onEliminar = { registroId ->
                         viewModel.eliminarRegistroEspecifico(registroId)
                     },
-                    onEditar = { registroId, nombre, ml, porcentaje -> // NUEVO: Editar registro
+                    onEditar = { registroId, nombre, ml, porcentaje ->
                         viewModel.editarRegistro(registroId, nombre, ml, porcentaje)
                     }
                 )
@@ -256,7 +269,7 @@ fun SemanaNavigationCard(
 
                 IconButton(
                     onClick = onSemanaSiguiente,
-                    enabled = !esSemanaActual // CAMBIO: Deshabilitar si ya estamos en semana actual
+                    enabled = !esSemanaActual
                 ) {
                     Icon(
                         imageVector = Icons.Default.ChevronRight,
@@ -275,8 +288,20 @@ fun SemanaNavigationCard(
 @Composable
 fun ResumenAlcoholCard(
     totalAlcoholPuro: Double,
-    estadoSalud: EstadoSalud
+    estadoSalud: EstadoSalud,
+    sistemaUnidades: SistemaUnidades // NUEVO: Sistema de unidades
 ) {
+    // NUEVO: Convertir valores según sistema de unidades
+    val totalMostrar = when (sistemaUnidades) {
+        SistemaUnidades.MILILITROS -> totalAlcoholPuro
+        SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(totalAlcoholPuro)
+    }
+
+    val limiteRecomendado = when (sistemaUnidades) {
+        SistemaUnidades.MILILITROS -> 140.0
+        SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(140.0)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -332,14 +357,19 @@ fun ResumenAlcoholCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Total de alcohol puro
+            // Total de alcohol puro - MODIFICADO para mostrar unidades correctas
             Text(
-                text = "Total de alcohol puro: ${String.format("%.1f", totalAlcoholPuro)} ml",
+                text = "Total de alcohol puro: ${
+                    ConvertirUnidades.formatearConUnidades(
+                        totalMostrar,
+                        sistemaUnidades
+                    )
+                }",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium
             )
 
-            // Barra de progreso visual
+            // Barra de progreso visual (siempre basada en ml para cálculo)
             LinearProgressIndicator(
                 progress = (totalAlcoholPuro / 280.0).toFloat().coerceAtMost(1f),
                 modifier = Modifier
@@ -354,8 +384,14 @@ fun ResumenAlcoholCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
+            // MODIFICADO: Mostrar límite en unidades correctas
             Text(
-                text = "Límite recomendado: 140 ml/semana",
+                text = "Límite recomendado: ${
+                    ConvertirUnidades.formatearConUnidades(
+                        limiteRecomendado,
+                        sistemaUnidades
+                    )
+                }/semana",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
@@ -367,11 +403,12 @@ fun ResumenAlcoholCard(
 fun DiaAlcoholCard(
     diaSemana: Int,
     fecha: LocalDate,
-    registros: List<AlcoholRecord>, // CAMBIO: Lista de registros en lugar de uno solo
+    registros: List<AlcoholRecord>,
+    sistemaUnidades: SistemaUnidades, // NUEVO: Sistema de unidades
     isLoading: Boolean,
     onActualizar: (String, String, String) -> Unit,
-    onEliminar: (String) -> Unit, // CAMBIO: Eliminar por ID específico
-    onEditar: (String, String, String, String) -> Unit // NUEVO: Editar registro específico
+    onEliminar: (String) -> Unit,
+    onEditar: (String, String, String, String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     var editingRegistroId by remember { mutableStateOf<String?>(null) }
@@ -399,6 +436,12 @@ fun DiaAlcoholCard(
 
     // Calcular total de alcohol del día
     val totalAlcoholDia = registros.sumOf { it.calcularAlcoholPuro() }
+
+    // NUEVO: Convertir para mostrar
+    val totalMostrar = when (sistemaUnidades) {
+        SistemaUnidades.MILILITROS -> totalAlcoholDia
+        SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(totalAlcoholDia)
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -445,8 +488,14 @@ fun DiaAlcoholCard(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
+                            // MODIFICADO: Mostrar unidades correctas
                             Text(
-                                text = "${String.format("%.1f", totalAlcoholDia)} ml alcohol",
+                                text = "${
+                                    ConvertirUnidades.formatearConUnidades(
+                                        totalMostrar,
+                                        sistemaUnidades
+                                    )
+                                } alcohol",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Medium
@@ -474,8 +523,18 @@ fun DiaAlcoholCard(
             if (registros.isNotEmpty() && !expanded) {
                 Spacer(modifier = Modifier.height(8.dp))
                 registros.forEach { registro ->
+                    // MODIFICADO: Mostrar mililitros convertidos si es necesario
+                    val mlMostrar = when (sistemaUnidades) {
+                        SistemaUnidades.MILILITROS -> registro.mililitros.toString()
+                        SistemaUnidades.ONZAS -> ConvertirUnidades.formatearConUnidades(
+                            ConvertirUnidades.mlAOnzas(registro.mililitros.toDouble()),
+                            sistemaUnidades,
+                            2
+                        )
+                    }
+
                     Text(
-                        text = "${registro.nombreBebida} • ${registro.mililitros}ml • ${registro.porcentajeAlcohol}%",
+                        text = "${registro.nombreBebida} • $mlMostrar • ${registro.porcentajeAlcohol}%",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -501,7 +560,9 @@ fun DiaAlcoholCard(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                    alpha = 0.5f
+                                )
                             )
                         ) {
                             if (editingRegistroId == registro.id) {
@@ -546,7 +607,12 @@ fun DiaAlcoholCard(
                                     ) {
                                         Button(
                                             onClick = {
-                                                onEditar(registro.id, editNombreBebida, editMililitros, editPorcentajeAlcohol)
+                                                onEditar(
+                                                    registro.id,
+                                                    editNombreBebida,
+                                                    editMililitros,
+                                                    editPorcentajeAlcohol
+                                                )
                                                 editingRegistroId = null
                                             },
                                             enabled = !isLoading
@@ -578,10 +644,34 @@ fun DiaAlcoholCard(
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Medium
                                         )
+
+                                        // MODIFICADO: Mostrar unidades correctas
+                                        val mlTexto = when (sistemaUnidades) {
+                                            SistemaUnidades.MILILITROS -> "${registro.mililitros}ml"
+                                            SistemaUnidades.ONZAS -> ConvertirUnidades.formatearConUnidades(
+                                                ConvertirUnidades.mlAOnzas(registro.mililitros.toDouble()),
+                                                sistemaUnidades,
+                                                2
+                                            )
+                                        }
+
+                                        val alcoholPuroTexto =
+                                            ConvertirUnidades.formatearConUnidades(
+                                                when (sistemaUnidades) {
+                                                    SistemaUnidades.MILILITROS -> registro.calcularAlcoholPuro()
+                                                    SistemaUnidades.ONZAS -> ConvertirUnidades.mlAOnzas(
+                                                        registro.calcularAlcoholPuro()
+                                                    )
+                                                },
+                                                sistemaUnidades
+                                            )
+
                                         Text(
-                                            text = "${registro.mililitros}ml • ${registro.porcentajeAlcohol}% • ${String.format("%.1f", registro.calcularAlcoholPuro())}ml alcohol",
+                                            text = "$mlTexto • ${registro.porcentajeAlcohol}% • $alcoholPuroTexto alcohol",
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            color = MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.6f
+                                            )
                                         )
                                     }
 
@@ -590,8 +680,10 @@ fun DiaAlcoholCard(
                                             onClick = {
                                                 editingRegistroId = registro.id
                                                 editNombreBebida = registro.nombreBebida
-                                                editMililitros = registro.mililitros.toString()
-                                                editPorcentajeAlcohol = registro.porcentajeAlcohol.toString()
+                                                editMililitros =
+                                                    registro.mililitros.toString()
+                                                editPorcentajeAlcohol =
+                                                    registro.porcentajeAlcohol.toString()
                                             }
                                         ) {
                                             Icon(
@@ -647,7 +739,7 @@ fun DiaAlcoholCard(
                     OutlinedTextField(
                         value = mililitros,
                         onValueChange = { mililitros = it },
-                        label = { Text("Mililitros") },
+                        label = { Text("Mililitros") }, // Nota: Siempre guardamos en ml internamente
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         enabled = !isLoading,
@@ -716,6 +808,7 @@ fun AlcoholTrackingScreenPreview() {
     Calis1Theme {
         AlcoholTrackingScreen(
             authState = AuthState.TraditionalSignedIn("admin"),
+            settingsRepository = SettingsRepository(LocalContext.current),
             onLogout = {}
         )
     }

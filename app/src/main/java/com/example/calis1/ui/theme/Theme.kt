@@ -1,6 +1,5 @@
 package com.example.calis1.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,8 +8,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.example.calis1.repository.SettingsRepository
+import com.example.calis1.viewmodel.AppConfiguraciones
+import com.example.calis1.viewmodel.TipoTema
 
 // Esquema de colores oscuro para BeerBattle
 private val BeerBattleDarkColorScheme = darkColorScheme(
@@ -82,14 +86,28 @@ private val BeerBattleLightColorScheme = lightColorScheme(
 
 @Composable
 fun Calis1Theme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    // NUEVO: Parámetro para controlar el tema desde configuraciones
+    settingsRepository: SettingsRepository? = null,
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false, // Cambiado a false para usar nuestros colores temáticos
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+
+    // NUEVO: Obtener configuraciones de tema si está disponible el repository
+    val configuraciones by (settingsRepository?.getConfiguraciones()
+        ?.collectAsState(initial = AppConfiguraciones()) // <-- CORRECCIÓN 1 AQUÍ
+        ?: return@Calis1Theme MaterialTheme(content = content))
+
+    // NUEVO: Determinar el tema basado en configuraciones
+    val darkTheme = when (configuraciones.tema) {
+        TipoTema.CLARO -> false
+        TipoTema.OSCURO -> true
+        TipoTema.SISTEMA -> isSystemInDarkTheme()
+    }
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
         darkTheme -> BeerBattleDarkColorScheme
@@ -101,4 +119,45 @@ fun Calis1Theme(
         typography = Typography,
         content = content
     )
+}
+
+/**
+ * NUEVO: Versión simplificada para usar en contextos donde no necesitas configuraciones dinámicas
+ */
+@Composable
+fun Calis1ThemeStatic(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
+    content: @Composable () -> Unit
+) {
+    val context = LocalContext.current
+
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> BeerBattleDarkColorScheme
+        else -> BeerBattleLightColorScheme
+    }
+
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
+}
+
+/**
+ * NUEVO: Hook para obtener el tema actual basado en configuraciones
+ */
+@Composable
+fun rememberThemeState(settingsRepository: SettingsRepository): Boolean {
+    val configuraciones by settingsRepository.getConfiguraciones()
+        .collectAsState(initial = AppConfiguraciones()) // <-- CORRECCIÓN 2 AQUÍ
+
+    return when (configuraciones.tema) {
+        TipoTema.CLARO -> false
+        TipoTema.OSCURO -> true
+        TipoTema.SISTEMA -> isSystemInDarkTheme()
+    }
 }

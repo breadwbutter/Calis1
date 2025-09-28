@@ -56,6 +56,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material3:material3")
+
 
     // Iconos extendidos para Visibility y VisibilityOff (EXISTENTE - mantenido)
     implementation("androidx.compose.material:material-icons-extended:1.7.4")
