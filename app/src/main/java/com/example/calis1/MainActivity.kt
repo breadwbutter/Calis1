@@ -30,6 +30,7 @@ import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AlcoholTrackingViewModel
 import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
+import com.example.calis1.viewmodel.EventosViewModel // NUEVO: Importar EventosViewModel
 import com.example.calis1.viewmodel.NotasViewModel
 
 class MainActivity : ComponentActivity() {
@@ -110,7 +111,9 @@ fun MainAppWithNavigation(
                     Text(
                         text = when (currentRoute) {
                             NavigationRoutes.ALCOHOL_TRACKING -> "Control Semanal"
-                            NavigationRoutes.NOTAS -> "Notas" // Título actualizado
+                            NavigationRoutes.NOTAS -> "Notas"
+                            NavigationRoutes.EVENTOS -> "Eventos" // NUEVO: Título para eventos
+                            NavigationRoutes.EVENTOS_LIST -> "Lista de Eventos" // NUEVO: Título para lista de eventos
                             NavigationRoutes.PROFILE -> "Mi Perfil"
                             NavigationRoutes.HISTORY -> "Historial Semanal"
                             else -> "BeerBattle"
@@ -118,7 +121,10 @@ fun MainAppWithNavigation(
                     )
                 },
                 actions = {
-                    if (currentRoute != NavigationRoutes.PROFILE && currentRoute != NavigationRoutes.HISTORY) {
+                    if (currentRoute != NavigationRoutes.PROFILE &&
+                        currentRoute != NavigationRoutes.HISTORY &&
+                        currentRoute != NavigationRoutes.EVENTOS_LIST) { // NUEVO: Excluir lista de eventos
+
                         // Botón de perfil
                         IconButton(
                             onClick = {
@@ -131,13 +137,14 @@ fun MainAppWithNavigation(
                             )
                         }
 
-                        // Botón para cambiar entre alcohol y notas
+                        // Botón para cambiar entre pantallas principales
                         IconButton(
                             onClick = {
-                                val nextRoute = if (currentRoute == NavigationRoutes.ALCOHOL_TRACKING) {
-                                    NavigationRoutes.NOTAS
-                                } else {
-                                    NavigationRoutes.ALCOHOL_TRACKING
+                                val nextRoute = when (currentRoute) {
+                                    NavigationRoutes.ALCOHOL_TRACKING -> NavigationRoutes.NOTAS
+                                    NavigationRoutes.NOTAS -> NavigationRoutes.EVENTOS // NUEVO: Incluir eventos en rotación
+                                    NavigationRoutes.EVENTOS -> NavigationRoutes.ALCOHOL_TRACKING // NUEVO: Volver al inicio
+                                    else -> NavigationRoutes.ALCOHOL_TRACKING
                                 }
                                 navController.navigate(nextRoute) {
                                     popUpTo(NavigationRoutes.ALCOHOL_TRACKING) { inclusive = false }
@@ -150,11 +157,28 @@ fun MainAppWithNavigation(
                             )
                         }
                     }
+                },
+                // NUEVO: Botón de navegación hacia atrás para lista de eventos
+                navigationIcon = {
+                    if (currentRoute == NavigationRoutes.EVENTOS_LIST) {
+                        IconButton(
+                            onClick = {
+                                navController.popBackStack()
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Volver"
+                            )
+                        }
+                    }
                 }
             )
         },
         bottomBar = {
-            if (currentRoute != NavigationRoutes.PROFILE && currentRoute != NavigationRoutes.HISTORY) {
+            if (currentRoute != NavigationRoutes.PROFILE &&
+                currentRoute != NavigationRoutes.HISTORY &&
+                currentRoute != NavigationRoutes.EVENTOS_LIST) { // NUEVO: Excluir lista de eventos
                 NavigationBottomBar(
                     currentRoute = currentRoute,
                     onNavigate = { route ->
@@ -179,8 +203,25 @@ fun MainAppWithNavigation(
                 )
             }
 
-            composable(NavigationRoutes.NOTAS) { // Ruta actualizada
-                NotasAppWrapper(paddingValues = PaddingValues(0.dp)) // Llamar al nuevo wrapper
+            composable(NavigationRoutes.NOTAS) {
+                NotasAppWrapper(paddingValues = PaddingValues(0.dp))
+            }
+
+            // NUEVO: Pantalla de eventos
+            composable(NavigationRoutes.EVENTOS) {
+                EventosScreenWrapper(
+                    authState = authState,
+                    paddingValues = PaddingValues(0.dp),
+                    navController = navController
+                )
+            }
+
+            // NUEVO: Lista de eventos
+            composable(NavigationRoutes.EVENTOS_LIST) {
+                EventosListScreenWrapper(
+                    authState = authState,
+                    paddingValues = PaddingValues(0.dp)
+                )
             }
 
             composable(NavigationRoutes.PROFILE) {
@@ -229,13 +270,26 @@ fun NavigationBottomBar(
         NavigationBarItem(
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Notes, // Icono actualizado
+                    imageVector = Icons.Default.Notes,
                     contentDescription = "Notas"
                 )
             },
-            label = { Text("Notas") }, // Label actualizado
-            selected = currentRoute == NavigationRoutes.NOTAS, // Ruta actualizada
-            onClick = { onNavigate(NavigationRoutes.NOTAS) } // Ruta actualizada
+            label = { Text("Notas") },
+            selected = currentRoute == NavigationRoutes.NOTAS,
+            onClick = { onNavigate(NavigationRoutes.NOTAS) }
+        )
+
+        // NUEVO: Botón de navegación para eventos
+        NavigationBarItem(
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Event,
+                    contentDescription = "Eventos"
+                )
+            },
+            label = { Text("Eventos") },
+            selected = currentRoute == NavigationRoutes.EVENTOS,
+            onClick = { onNavigate(NavigationRoutes.EVENTOS) }
         )
     }
 }
@@ -285,6 +339,50 @@ fun AlcoholTrackingScreenWrapper(
     }
 }
 
+// NUEVO: Wrapper para EventosScreen
+@Composable
+fun EventosScreenWrapper(
+    authState: AuthState,
+    paddingValues: PaddingValues,
+    navController: NavHostController
+) {
+    val eventosViewModel: EventosViewModel = viewModel()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        EventosScreen(
+            viewModel = eventosViewModel,
+            authState = authState,
+            onVerEventosClick = {
+                navController.navigate(NavigationRoutes.EVENTOS_LIST)
+            }
+        )
+    }
+}
+
+// NUEVO: Wrapper para EventosListScreen
+@Composable
+fun EventosListScreenWrapper(
+    authState: AuthState,
+    paddingValues: PaddingValues
+) {
+    val eventosViewModel: EventosViewModel = viewModel()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(paddingValues)
+    ) {
+        EventosListScreen(
+            viewModel = eventosViewModel,
+            authState = authState
+        )
+    }
+}
+
 @Composable
 fun NotasAppWrapper(paddingValues: PaddingValues) {
     val viewModel: NotasViewModel = viewModel()
@@ -330,7 +428,7 @@ fun NotasAppWrapper(paddingValues: PaddingValues) {
                     label = { Text("Nota") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(100.dp) // Hacerlo más alto para contenido
+                        .height(100.dp)
                 )
 
                 Row(
@@ -469,7 +567,6 @@ fun NotaItem(
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable
