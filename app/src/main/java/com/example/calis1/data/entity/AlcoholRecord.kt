@@ -11,13 +11,13 @@ import java.time.format.DateTimeFormatter
 data class AlcoholRecord(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),
-    val userId: String = "", // Para identificar al usuario logueado
-    val fecha: String = "", // Formato YYYY-MM-DD
-    val diaSemana: Int = 1, // 1=Domingo, 2=Lunes, ..., 7=Sábado
+    val userId: String = "",
+    val fecha: String = "",
+    val diaSemana: Int = 1,
     val nombreBebida: String = "",
     val mililitros: Int = 0,
     val porcentajeAlcohol: Double = 0.0,
-    val semanaInicio: String = "", // Fecha del domingo de esa semana (YYYY-MM-DD)
+    val semanaInicio: String = "",
     val timestamp: Long = System.currentTimeMillis()
 ) {
     // Constructor sin argumentos para Firebase

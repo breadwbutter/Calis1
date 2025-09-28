@@ -43,7 +43,7 @@ interface EventoDao {
     @Query("SELECT COUNT(*) FROM eventos WHERE userId = :userId")
     fun getEventosCount(userId: String): Flow<Int>
 
-    // MEJORADO: Buscar eventos por título, descripción O fecha (búsqueda completa)
+    //Buscar eventos por título, descripción O fecha (búsqueda completa)
     @Query("""
         SELECT * FROM eventos 
         WHERE userId = :userId 
@@ -56,7 +56,7 @@ interface EventoDao {
     """)
     suspend fun buscarEventos(userId: String, query: String): List<Evento>
 
-    // NUEVO: Búsqueda con Flow reactivo para la pantalla de búsqueda
+    //Búsqueda con Flow reactivo para la pantalla de búsqueda
     @Query("""
         SELECT * FROM eventos 
         WHERE userId = :userId 
@@ -73,7 +73,7 @@ interface EventoDao {
     @Query("SELECT * FROM eventos WHERE userId = :userId AND fecha = :fecha ORDER BY timestamp DESC")
     suspend fun getEventosPorFecha(userId: String, fecha: String): List<Evento>
 
-    // NUEVO: Búsqueda avanzada por campos específicos
+    //Búsqueda avanzada por campos específicos
     @Query("""
         SELECT * FROM eventos 
         WHERE userId = :userId 

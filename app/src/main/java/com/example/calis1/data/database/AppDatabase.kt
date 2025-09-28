@@ -16,21 +16,21 @@ import com.example.calis1.data.entity.Nota
 import com.example.calis1.data.entity.Usuario
 
 @Database(
-    entities = [Usuario::class, AlcoholRecord::class, Nota::class, Evento::class], // NUEVO: Agregar Evento::class
-    version = 4, // NUEVO: Incrementar la versión a 4
+    entities = [Usuario::class, AlcoholRecord::class, Nota::class, Evento::class],
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun usuarioDao(): UsuarioDao
     abstract fun alcoholRecordDao(): AlcoholRecordDao
     abstract fun notaDao(): NotaDao
-    abstract fun eventoDao(): EventoDao // NUEVO: Agregar el método abstracto para EventoDao
+    abstract fun eventoDao(): EventoDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
-        // Migración existente 1 -> 2
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
@@ -58,7 +58,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // Migración existente 2 -> 3 (para Notas)
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
@@ -73,7 +72,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        // NUEVA: Migración 3 -> 4 (para Eventos)
         val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""
@@ -88,7 +86,6 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 """.trimIndent())
 
-                // Crear índices para mejorar el rendimiento
                 database.execSQL("""
                     CREATE INDEX IF NOT EXISTS `index_eventos_userId` 
                     ON `eventos` (`userId`)
@@ -108,7 +105,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4) // NUEVO: Agregar MIGRATION_3_4
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

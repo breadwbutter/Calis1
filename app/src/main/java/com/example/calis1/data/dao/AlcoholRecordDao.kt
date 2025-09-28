@@ -19,11 +19,11 @@ interface AlcoholRecordDao {
     @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio ORDER BY diaSemana ASC, timestamp ASC")
     suspend fun getRegistrosSemanaSync(userId: String, semanaInicio: String): List<AlcoholRecord>
 
-    // NUEVO: Obtener TODOS los registros de un día específico (múltiples registros por día)
+    //Obtener TODOS los registros de un día específico (múltiples registros por día)
     @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio AND diaSemana = :diaSemana ORDER BY timestamp ASC")
     suspend fun getRegistrosPorDia(userId: String, semanaInicio: String, diaSemana: Int): List<AlcoholRecord>
 
-    // NUEVO: Obtener TODOS los registros de un día específico como Flow (reactivo)
+    //Obtener TODOS los registros de un día específico como Flow (reactivo)
     @Query("SELECT * FROM alcohol_records WHERE userId = :userId AND semanaInicio = :semanaInicio AND diaSemana = :diaSemana ORDER BY timestamp ASC")
     fun getRegistrosPorDiaFlow(userId: String, semanaInicio: String, diaSemana: Int): Flow<List<AlcoholRecord>>
 
