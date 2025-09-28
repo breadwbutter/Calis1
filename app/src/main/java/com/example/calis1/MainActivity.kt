@@ -9,11 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
@@ -25,9 +21,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.calis1.data.entity.Usuario
+import com.example.calis1.navigation.NavigationRoutes
 import com.example.calis1.ui.theme.Calis1Theme
 import com.example.calis1.viewmodel.AuthState
 import com.example.calis1.viewmodel.AuthViewModel
@@ -50,19 +52,19 @@ class MainActivity : ComponentActivity() {
 fun MainApp() {
     val authViewModel: AuthViewModel = viewModel()
     val context = LocalContext.current
+    val navController = rememberNavController()
 
-    // NUEVO: Estado para controlar splash screen
+    // Estado para controlar splash screen
     var showSplash by remember { mutableStateOf(true) }
 
     // Estados existentes
     val authState by authViewModel.authState.collectAsState()
 
-    // NUEVO: Mostrar splash screen primero
+    // Mostrar splash screen primero
     if (showSplash) {
         SplashScreen(
             onSplashFinished = {
                 showSplash = false
-                // Inicializar AuthViewModel después del splash
                 authViewModel.initialize(context)
             }
         )
@@ -72,16 +74,13 @@ fun MainApp() {
     // Determinar si mostrar la pantalla principal o login
     when (authState) {
         is AuthState.Loading -> {
-            println("🔍 DEBUG: MainActivity - Mostrando LoadingScreen")
-            // Mostrar pantalla de carga mientras verifica sesión
             LoadingScreen()
         }
         is AuthState.SignedIn,
         is AuthState.TraditionalSignedIn,
         is AuthState.EmailSignedIn -> {
-            println("🔍 DEBUG: MainActivity - Mostrando MainScreen con opciones")
-            // Usuario logueado - mostrar pantalla principal con selección
-            MainAppScreen(
+            MainAppWithNavigation(
+                navController = navController,
                 authState = authState,
                 onLogout = {
                     authViewModel.signOut(context)
@@ -91,13 +90,162 @@ fun MainApp() {
         is AuthState.SignedOut,
         is AuthState.Error,
         is AuthState.RegistrationSuccess -> {
-            println("🔍 DEBUG: MainActivity - Mostrando LoginScreen")
-            // Usuario no logueado - mostrar login
             LoginScreen(
-                authViewModel = authViewModel,
-                onLoginSuccess = { /* El estado cambiará automáticamente */ }
+                authViewModel = authViewModel
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainAppWithNavigation(
+    navController: NavHostController,
+    authState: AuthState,
+    onLogout: () -> Unit
+) {
+    val currentDestination by navController.currentBackStackEntryAsState()
+    val currentRoute = currentDestination?.destination?.route
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = when (currentRoute) {
+                            NavigationRoutes.ALCOHOL_TRACKING -> "Control Semanal"
+                            NavigationRoutes.USUARIOS -> "Gestión Usuarios"
+                            NavigationRoutes.PROFILE -> "Mi Perfil"
+                            NavigationRoutes.HISTORY -> "Historial Semanal" // Título para historial
+                            else -> "BeerBattle"
+                        }
+                    )
+                },
+                actions = {
+                    if (currentRoute != NavigationRoutes.PROFILE && currentRoute != NavigationRoutes.HISTORY) {
+                        // Botón de perfil
+                        IconButton(
+                            onClick = {
+                                navController.navigate(NavigationRoutes.PROFILE)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Mi perfil"
+                            )
+                        }
+
+                        // Botón para cambiar entre alcohol y usuarios
+                        IconButton(
+                            onClick = {
+                                val nextRoute = if (currentRoute == NavigationRoutes.ALCOHOL_TRACKING) {
+                                    NavigationRoutes.USUARIOS
+                                } else {
+                                    NavigationRoutes.ALCOHOL_TRACKING
+                                }
+                                navController.navigate(nextRoute) {
+                                    popUpTo(NavigationRoutes.ALCOHOL_TRACKING) { inclusive = false }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = "Cambiar pantalla"
+                            )
+                        }
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            if (currentRoute != NavigationRoutes.PROFILE && currentRoute != NavigationRoutes.HISTORY) {
+                NavigationBottomBar(
+                    currentRoute = currentRoute,
+                    onNavigate = { route ->
+                        navController.navigate(route) {
+                            popUpTo(NavigationRoutes.ALCOHOL_TRACKING) { inclusive = false }
+                        }
+                    }
+                )
+            }
+        }
+    ) { paddingValues ->
+        NavHost(
+            navController = navController,
+            startDestination = NavigationRoutes.ALCOHOL_TRACKING,
+            modifier = Modifier.padding(paddingValues)
+        ) {
+            composable(NavigationRoutes.ALCOHOL_TRACKING) {
+                AlcoholTrackingScreenWrapper(
+                    authState = authState,
+                    paddingValues = PaddingValues(0.dp),
+                    navController = navController // Pasar NavController
+                )
+            }
+
+            composable(NavigationRoutes.USUARIOS) {
+                UsuarioAppWrapper(
+                    authState = authState,
+                    onLogout = onLogout,
+                    paddingValues = PaddingValues(0.dp)
+                )
+            }
+
+            composable(NavigationRoutes.PROFILE) {
+                UserProfileScreen(
+                    authState = authState,
+                    onLogout = {
+                        onLogout()
+                        navController.navigate(NavigationRoutes.ALCOHOL_TRACKING) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            // Nueva ruta para el historial
+            composable(NavigationRoutes.HISTORY) {
+                val userId = when (authState) {
+                    is AuthState.SignedIn -> authState.user.uid
+                    is AuthState.TraditionalSignedIn -> "admin"
+                    is AuthState.EmailSignedIn -> authState.email
+                    else -> ""
+                }
+                HistoryScreen(userId = userId)
+            }
+        }
+    }
+}
+
+@Composable
+fun NavigationBottomBar(
+    currentRoute: String?,
+    onNavigate: (String) -> Unit
+) {
+    NavigationBar {
+        NavigationBarItem(
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.LocalBar,
+                    contentDescription = "Control semanal"
+                )
+            },
+            label = { Text("Control") },
+            selected = currentRoute == NavigationRoutes.ALCOHOL_TRACKING,
+            onClick = { onNavigate(NavigationRoutes.ALCOHOL_TRACKING) }
+        )
+
+        NavigationBarItem(
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.People,
+                    contentDescription = "Usuarios"
+                )
+            },
+            label = { Text("Usuarios") },
+            selected = currentRoute == NavigationRoutes.USUARIOS,
+            onClick = { onNavigate(NavigationRoutes.USUARIOS) }
+        )
     }
 }
 
@@ -127,98 +275,14 @@ fun LoadingScreen() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainAppScreen(
-    authState: AuthState,
-    onLogout: () -> Unit
-) {
-    // Estado para controlar qué pantalla mostrar
-    var currentScreen by remember { mutableStateOf("alcohol") } // "alcohol", "history" o "usuarios"
-
-    // Determinar título y usuario actual basado en el tipo de autenticación
-    val (titlePrefix, currentUser) = when (authState) {
-        is AuthState.SignedIn -> "Firebase: ${authState.user.displayName ?: authState.user.email}" to authState.user.uid
-        is AuthState.TraditionalSignedIn -> "Admin: ${authState.username}" to "admin"
-        is AuthState.EmailSignedIn -> "Email: ${authState.username}" to authState.email
-        else -> "Usuario" to "Desconocido"
-    }
-
-    // Scaffold principal con TopBar que permite cambiar entre pantallas
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        when (currentScreen) {
-                            "alcohol" -> "Control Semanal"
-                            "history" -> "Historial Semanal"
-                            else -> "BeerBattle - Gestión Usuarios"
-                        }
-                    )
-                },
-                actions = {
-                    // Botón para cambiar entre pantallas
-                    IconButton(
-                        onClick = {
-                            currentScreen = if (currentScreen == "alcohol" || currentScreen == "history") "usuarios" else "alcohol"
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.SwapHoriz,
-                            contentDescription = "Cambiar pantalla",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // Botón de logout
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            imageVector = Icons.Default.ExitToApp,
-                            contentDescription = "Cerrar sesión"
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        // Mostrar la pantalla correspondiente
-        when (currentScreen) {
-            "alcohol" -> {
-                AlcoholTrackingScreenWrapper(
-                    authState = authState,
-                    paddingValues = paddingValues,
-                    onNavigateToHistory = {
-                        currentScreen = "history"
-                    }
-                )
-            }
-            "history" -> {
-                // Muestra la nueva pantalla de historial
-                HistoryScreen(userId = currentUser)
-            }
-            "usuarios" -> {
-                // Pantalla original de gestión de usuarios (mantenida)
-                UsuarioApp(
-                    authState = authState,
-                    onLogout = onLogout,
-                    paddingValues = paddingValues
-                )
-            }
-        }
-    }
-}
-
 @Composable
 fun AlcoholTrackingScreenWrapper(
     authState: AuthState,
     paddingValues: PaddingValues,
-    onNavigateToHistory: () -> Unit
+    navController: NavHostController // Recibir NavController
 ) {
-    // ViewModel específico para seguimiento de alcohol
     val alcoholViewModel: AlcoholTrackingViewModel = viewModel()
 
-    // Wrapper para la pantalla de alcohol con padding
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -228,36 +292,33 @@ fun AlcoholTrackingScreenWrapper(
             viewModel = alcoholViewModel,
             authState = authState,
             onLogout = { /* Ya manejado en el nivel superior */ },
-            onHistorialClick = onNavigateToHistory
+            onHistorialClick = {
+                // Implementar navegación
+                navController.navigate(NavigationRoutes.HISTORY)
+            }
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UsuarioApp(
-    viewModel: UsuarioViewModel = viewModel(),
+fun UsuarioAppWrapper(
     authState: AuthState,
     onLogout: () -> Unit,
     paddingValues: PaddingValues
 ) {
+    val viewModel: UsuarioViewModel = viewModel()
     var nombre by remember { mutableStateOf("") }
     var edad by remember { mutableStateOf("") }
 
-    // StateFlow - Estados reactivos
     val usuarios by viewModel.allUsuarios.collectAsState()
-    val usuariosCount by viewModel.usuariosCount.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
     val context = LocalContext.current
-
-    // Observar estado de WorkManager
-    val workManager = WorkManager.getInstance(context)
     var workStatus by remember { mutableStateOf("Inactivo") }
 
     LaunchedEffect(Unit) {
-        // Observar trabajos de sincronización
-        workManager.getWorkInfosForUniqueWorkLiveData("periodic_sync").observeForever { workInfos ->
+        WorkManager.getInstance(context).getWorkInfosForUniqueWorkLiveData("periodic_sync").observeForever { workInfos ->
             workStatus = when {
                 workInfos.any { it.state == WorkInfo.State.RUNNING } -> "Sincronizando..."
                 workInfos.any { it.state == WorkInfo.State.ENQUEUED } -> "Programado"
@@ -267,7 +328,6 @@ fun UsuarioApp(
         }
     }
 
-    // Auto-limpiar mensajes después de 3 segundos
     LaunchedEffect(uiState.lastAction, uiState.error) {
         if (uiState.lastAction != null || uiState.error != null) {
             kotlinx.coroutines.delay(3000)
@@ -282,7 +342,6 @@ fun UsuarioApp(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Snackbar para mensajes de estado
         if (uiState.error != null || uiState.lastAction != null) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -304,7 +363,6 @@ fun UsuarioApp(
             }
         }
 
-        // Formulario de entrada
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -368,7 +426,6 @@ fun UsuarioApp(
             }
         }
 
-        // Lista de usuarios con indicador de estado
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -389,7 +446,6 @@ fun UsuarioApp(
                 }
             }
 
-            // Indicador discreto de WorkManager
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -441,7 +497,6 @@ fun UsuarioApp(
             }
         }
 
-        // Lista de usuarios o mensaje vacío
         if (uiState.hasUsers) {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -458,7 +513,6 @@ fun UsuarioApp(
                 }
             }
         } else {
-            // Estado vacío
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -561,4 +615,3 @@ fun MainAppPreview() {
         MainApp()
     }
 }
-//
